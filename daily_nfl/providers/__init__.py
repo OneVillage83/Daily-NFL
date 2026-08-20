@@ -11,6 +11,12 @@ from daily_nfl.providers.contracts import (
     ProviderDescriptor,
     ProviderPayload,
 )
+from daily_nfl.providers.metadata import (
+    ProviderMetadataConflictError,
+    RawEvidenceMetadataConflictError,
+    record_provider,
+    record_stored_acquisition,
+)
 from daily_nfl.providers.nflverse import (
     NFLVERSE_DESCRIPTOR,
     NflverseAdapter,
@@ -50,17 +56,21 @@ __all__ = [
     "ProviderAdapter",
     "ProviderCapability",
     "ProviderDescriptor",
+    "ProviderMetadataConflictError",
     "ProviderPayload",
     "ProviderRegistrationError",
     "ProviderRegistry",
     "RawEvidenceArtifact",
     "RawEvidenceCollisionError",
+    "RawEvidenceMetadataConflictError",
     "RawEvidenceStore",
     "StoredAcquisition",
     "StoredEvidence",
     "UnsupportedDatasetError",
     "UnsupportedRawAssetMappingError",
     "evidence_id_for",
+    "record_provider",
+    "record_stored_acquisition",
     "resolve_nflverse_assets",
     "sha256_bytes",
 ]
