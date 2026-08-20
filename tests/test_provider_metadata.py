@@ -15,6 +15,7 @@ from daily_nfl.providers import (
     ProviderDescriptor,
     ProviderMetadataConflictError,
     ProviderPayload,
+    StoredAcquisition,
     record_provider,
     record_stored_acquisition,
 )
@@ -33,7 +34,7 @@ def _payload(observed_at: datetime) -> ProviderPayload:
     )
 
 
-def _acquire(tmp_path: Path, payload: ProviderPayload):
+def _acquire(tmp_path: Path, payload: ProviderPayload) -> StoredAcquisition:
     request = AcquisitionRequest(dataset=DatasetKind.SCHEDULE)
     adapter = NflverseAdapter(loader=lambda _: (payload,))
     service = AcquisitionService(FileSystemRawEvidenceStore(tmp_path / "raw"))
