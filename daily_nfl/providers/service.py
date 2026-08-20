@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 from daily_nfl.providers.contracts import (
     AcquisitionRequest,
@@ -14,17 +15,27 @@ from daily_nfl.providers.raw_store import RawEvidenceArtifact, RawEvidenceStore
 
 
 @dataclass(frozen=True, slots=True)
+class StoredEvidence:
+    payload: ProviderPayload
+    artifact: RawEvidenceArtifact
+    ingested_at: datetime
+
+    def __post_init__(self) -> None:
+        if self.ingested_at.tzinfo is None or self.ingested_at.utcoffset() is None:
+            raise ValueError("ingested_at must be timezone-aware")
+        if self.ingested_at < self.payload.observed_at:
+            raise ValueError("ingested_at cannot precede observed_at")
+
+
+@dataclass(frozen=True, slots=True)
 class StoredAcquisition:
     descriptor: ProviderDescriptor
     request: AcquisitionRequest
-    payloads: tuple[ProviderPayload, ...]
-    artifacts: tuple[RawEvidenceArtifact, ...]
+    evidence: tuple[StoredEvidence, ...]
 
     def __post_init__(self) -> None:
-        if not self.payloads or not self.artifacts:
-            raise ValueError("stored acquisition requires raw payloads and artifacts")
-        if len(self.payloads) != len(self.artifacts):
-            raise ValueError("raw payload and artifact counts must match")
+        if not self.evidence:
+            raise ValueError("stored acquisition requires at least one raw evidence object")
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,13 +44,20 @@ class AcquisitionService:
 
     def acquire(self, provider: ProviderAdapter, request: AcquisitionRequest) -> StoredAcquisition:
         payloads = provider.acquire(request)
-        artifacts = tuple(
-            self.raw_store.put(provider.descriptor.provider_id, request.dataset, payload)
+        evidence = tuple(
+            StoredEvidence(
+                payload=payload,
+                artifact=self.raw_store.put(
+                    provider.descriptor.provider_id,
+                    request.dataset,
+                    payload,
+                ),
+                ingested_at=datetime.now(UTC),
+            )
             for payload in payloads
         )
         return StoredAcquisition(
             descriptor=provider.descriptor,
             request=request,
-            payloads=payloads,
-            artifacts=artifacts,
+            evidence=evidence,
         )
