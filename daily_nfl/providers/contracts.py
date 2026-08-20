@@ -1,7 +1,7 @@
 """Provider-neutral acquisition contracts for Daily NFL.
 
-Providers return raw payloads and provenance first. Provider-shaped data must
-not flow directly into features or football state calculations.
+Providers return exact raw payloads and provenance first. Provider-shaped data
+must not flow directly into features or football state calculations.
 """
 
 from __future__ import annotations
@@ -123,7 +123,7 @@ class AcquisitionRequest:
 
 @dataclass(frozen=True, slots=True)
 class ProviderPayload:
-    """Exact raw provider response plus source/provenance clocks."""
+    """One exact raw provider asset plus source/provenance clocks."""
 
     content: bytes = field(repr=False)
     content_type: str
@@ -160,7 +160,7 @@ class ProviderAdapter(Protocol):
     @property
     def descriptor(self) -> ProviderDescriptor: ...
 
-    def acquire(self, request: AcquisitionRequest) -> ProviderPayload: ...
+    def acquire(self, request: AcquisitionRequest) -> tuple[ProviderPayload, ...]: ...
 
 
 NormalizedT = TypeVar("NormalizedT")
@@ -168,20 +168,25 @@ NormalizedT = TypeVar("NormalizedT")
 
 @dataclass(frozen=True, slots=True)
 class NormalizedAcquisition(Generic[NormalizedT]):
-    """Typed normalized records linked back to immutable raw evidence."""
+    """Typed normalized records linked back to every contributing raw asset."""
 
     provider_id: str
     dataset: DatasetKind
     parser_version: str
     provider_schema_version: str | None
-    evidence_id: str
+    evidence_ids: tuple[str, ...]
     records: tuple[NormalizedT, ...]
 
     def __post_init__(self) -> None:
         for value, label in (
             (self.provider_id, "provider_id"),
             (self.parser_version, "parser_version"),
-            (self.evidence_id, "evidence_id"),
         ):
             if not value.strip():
                 raise ValueError(f"{label} cannot be blank")
+        if not self.evidence_ids:
+            raise ValueError("normalized acquisition requires at least one evidence_id")
+        if any(not evidence_id.strip() for evidence_id in self.evidence_ids):
+            raise ValueError("evidence_ids cannot contain blanks")
+        if len(self.evidence_ids) != len(set(self.evidence_ids)):
+            raise ValueError("evidence_ids cannot contain duplicates")
