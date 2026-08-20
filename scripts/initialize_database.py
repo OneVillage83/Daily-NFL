@@ -5,8 +5,13 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import sys
 
-from daily_nfl.persistence import (
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+if str(REPOSITORY_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPOSITORY_ROOT))
+
+from daily_nfl.persistence import (  # noqa: E402
     SCHEMA_VERSION,
     apply_migrations,
     current_schema_version,
