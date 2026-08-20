@@ -102,9 +102,9 @@ def test_registry_is_idempotent_but_rejects_conflicting_provider_id() -> None:
 def test_nflverse_adapter_rejects_undeclared_dataset_before_loader_call() -> None:
     calls: list[AcquisitionRequest] = []
 
-    def loader(request: AcquisitionRequest) -> ProviderPayload:
+    def loader(request: AcquisitionRequest) -> tuple[ProviderPayload, ...]:
         calls.append(request)
-        return _payload()
+        return (_payload(),)
 
     adapter = NflverseAdapter(loader=loader)
 
@@ -118,20 +118,27 @@ def test_nflverse_adapter_uses_injected_loader_for_declared_dataset() -> None:
     request = AcquisitionRequest(dataset=DatasetKind.SCHEDULE, seasons=(2025, 2026))
     payload = _payload()
 
-    adapter = NflverseAdapter(loader=lambda received: payload if received == request else _payload())
+    adapter = NflverseAdapter(loader=lambda _: (payload,))
 
-    assert adapter.acquire(request) is payload
+    assert adapter.acquire(request) == (payload,)
 
 
-def test_normalized_acquisition_retains_raw_evidence_lineage() -> None:
+def test_nflverse_adapter_rejects_empty_raw_batch() -> None:
+    adapter = NflverseAdapter(loader=lambda _: ())
+
+    with pytest.raises(ValueError, match="no raw payloads"):
+        adapter.acquire(AcquisitionRequest(dataset=DatasetKind.SCHEDULE))
+
+
+def test_normalized_acquisition_retains_multi_asset_evidence_lineage() -> None:
     normalized = NormalizedAcquisition[str](
         provider_id="nflverse",
-        dataset=DatasetKind.SCHEDULE,
+        dataset=DatasetKind.PLAY_BY_PLAY,
         parser_version="NFLVERSE_ADAPTER_V1",
         provider_schema_version="fixture-v1",
-        evidence_id="evidence-123",
+        evidence_ids=("evidence-2025", "evidence-2026"),
         records=("record-1", "record-2"),
     )
 
-    assert normalized.evidence_id == "evidence-123"
+    assert normalized.evidence_ids == ("evidence-2025", "evidence-2026")
     assert normalized.records == ("record-1", "record-2")
