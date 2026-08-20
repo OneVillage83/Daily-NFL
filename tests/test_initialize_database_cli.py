@@ -1,7 +1,7 @@
 import json
-from pathlib import Path
 import subprocess
 import sys
+from pathlib import Path
 
 
 def test_initialize_database_script_runs_directly(tmp_path: Path) -> None:
