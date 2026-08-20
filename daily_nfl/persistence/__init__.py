@@ -5,6 +5,7 @@ from daily_nfl.persistence.database import (
     connect_database,
     foreign_keys_enabled,
     integrity_ok,
+    open_database,
 )
 from daily_nfl.persistence.migrations import (
     SchemaVersionError,
@@ -22,4 +23,5 @@ __all__ = [
     "current_schema_version",
     "foreign_keys_enabled",
     "integrity_ok",
+    "open_database",
 ]
