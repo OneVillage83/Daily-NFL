@@ -1,7 +1,7 @@
 """Versioned SQLite migrations for Daily NFL."""
 
-from dataclasses import dataclass
 import sqlite3
+from dataclasses import dataclass
 
 from daily_nfl.persistence.schema import INITIAL_SCHEMA_SQL, SCHEMA_VERSION
 
