@@ -78,7 +78,7 @@ def test_store_refuses_to_overwrite_tampered_evidence(tmp_path: Path) -> None:
     assert object_path.read_bytes() == b"tampered"
 
 
-def test_acquisition_service_persists_every_raw_asset(tmp_path: Path) -> None:
+def test_acquisition_service_pairs_and_persists_every_raw_asset(tmp_path: Path) -> None:
     payloads = (_payload(b"season-2025"), _payload(b"season-2026"))
     request = AcquisitionRequest(dataset=DatasetKind.PLAY_BY_PLAY, seasons=(2025, 2026))
     adapter = NflverseAdapter(loader=lambda _: payloads)
@@ -89,7 +89,8 @@ def test_acquisition_service_persists_every_raw_asset(tmp_path: Path) -> None:
 
     assert acquired.descriptor.provider_id == "nflverse"
     assert acquired.request == request
-    assert acquired.payloads == payloads
-    assert len(acquired.artifacts) == 2
-    for payload, artifact in zip(acquired.payloads, acquired.artifacts, strict=True):
-        assert (store.root / artifact.relative_path).read_bytes() == payload.content
+    assert len(acquired.evidence) == 2
+    for payload, evidence in zip(payloads, acquired.evidence, strict=True):
+        assert evidence.payload is payload
+        assert evidence.ingested_at >= payload.observed_at
+        assert (store.root / evidence.artifact.relative_path).read_bytes() == payload.content
