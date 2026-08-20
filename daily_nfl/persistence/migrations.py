@@ -22,6 +22,18 @@ class SchemaVersionError(RuntimeError):
     """Raised when a database schema cannot be safely migrated."""
 
 
+def _user_tables(connection: sqlite3.Connection) -> set[str]:
+    rows = connection.execute(
+        """
+        SELECT name
+        FROM sqlite_master
+        WHERE type = 'table'
+          AND name NOT LIKE 'sqlite_%'
+        """
+    ).fetchall()
+    return {str(row[0]) for row in rows}
+
+
 def current_schema_version(connection: sqlite3.Connection) -> int:
     table_exists = connection.execute(
         "SELECT 1 FROM sqlite_master WHERE type='table' AND name='schema_migrations'"
@@ -40,6 +52,10 @@ def apply_migrations(connection: sqlite3.Connection) -> int:
     current = current_schema_version(connection)
     latest = max(migration.version for migration in MIGRATIONS)
 
+    if current == 0 and _user_tables(connection):
+        raise SchemaVersionError(
+            "refusing to migrate an unversioned or incomplete non-empty database"
+        )
     if current > latest or current > SCHEMA_VERSION:
         raise SchemaVersionError(
             f"database schema version {current} is newer than supported version {SCHEMA_VERSION}"
