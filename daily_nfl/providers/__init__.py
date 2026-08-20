@@ -16,6 +16,13 @@ from daily_nfl.providers.nflverse import (
     NflverseAdapter,
     UnsupportedDatasetError,
 )
+from daily_nfl.providers.nflverse_http import (
+    NFLVERSE_RELEASE_BASE,
+    NflverseAsset,
+    NflverseHttpLoader,
+    UnsupportedRawAssetMappingError,
+    resolve_nflverse_assets,
+)
 from daily_nfl.providers.raw_store import (
     FileSystemRawEvidenceStore,
     RawEvidenceArtifact,
@@ -34,7 +41,10 @@ __all__ = [
     "DatasetKind",
     "FileSystemRawEvidenceStore",
     "NFLVERSE_DESCRIPTOR",
+    "NFLVERSE_RELEASE_BASE",
     "NflverseAdapter",
+    "NflverseAsset",
+    "NflverseHttpLoader",
     "NormalizedAcquisition",
     "PointInTimeFidelity",
     "ProviderAdapter",
@@ -48,6 +58,8 @@ __all__ = [
     "RawEvidenceStore",
     "StoredAcquisition",
     "UnsupportedDatasetError",
+    "UnsupportedRawAssetMappingError",
     "evidence_id_for",
+    "resolve_nflverse_assets",
     "sha256_bytes",
 ]
