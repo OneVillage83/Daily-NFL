@@ -10,8 +10,8 @@ from daily_nfl.providers import (
     DatasetKind,
     FileSystemRawEvidenceStore,
     NflverseAdapter,
-    RawEvidenceCollisionError,
     ProviderPayload,
+    RawEvidenceCollisionError,
     evidence_id_for,
     sha256_bytes,
 )
@@ -78,10 +78,10 @@ def test_store_refuses_to_overwrite_tampered_evidence(tmp_path: Path) -> None:
     assert object_path.read_bytes() == b"tampered"
 
 
-def test_acquisition_service_persists_raw_before_returning_envelope(tmp_path: Path) -> None:
-    payload = _payload()
-    request = AcquisitionRequest(dataset=DatasetKind.PLAY_BY_PLAY, seasons=(2026,))
-    adapter = NflverseAdapter(loader=lambda _: payload)
+def test_acquisition_service_persists_every_raw_asset(tmp_path: Path) -> None:
+    payloads = (_payload(b"season-2025"), _payload(b"season-2026"))
+    request = AcquisitionRequest(dataset=DatasetKind.PLAY_BY_PLAY, seasons=(2025, 2026))
+    adapter = NflverseAdapter(loader=lambda _: payloads)
     store = FileSystemRawEvidenceStore(tmp_path / "raw")
     service = AcquisitionService(raw_store=store)
 
@@ -89,5 +89,7 @@ def test_acquisition_service_persists_raw_before_returning_envelope(tmp_path: Pa
 
     assert acquired.descriptor.provider_id == "nflverse"
     assert acquired.request == request
-    assert acquired.payload is payload
-    assert (store.root / acquired.artifact.relative_path).read_bytes() == payload.content
+    assert acquired.payloads == payloads
+    assert len(acquired.artifacts) == 2
+    for payload, artifact in zip(acquired.payloads, acquired.artifacts, strict=True):
+        assert (store.root / artifact.relative_path).read_bytes() == payload.content
