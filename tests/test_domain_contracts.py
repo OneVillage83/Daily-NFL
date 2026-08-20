@@ -53,7 +53,7 @@ def test_franchise_and_team_season_are_distinct_identities() -> None:
     )
 
     assert team_season.franchise_id == franchise.franchise_id
-    assert team_season.team_season_id != TeamSeasonId(franchise.franchise_id)
+    assert str(team_season.team_season_id) != str(franchise.franchise_id)
 
 
 def test_person_and_player_are_distinct_from_team_membership() -> None:
