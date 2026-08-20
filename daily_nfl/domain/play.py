@@ -11,9 +11,9 @@ from daily_nfl.domain.enums import (
 )
 from daily_nfl.domain.ids import (
     DriveId,
+    PlayerId,
     PlayEventId,
     PlayId,
-    PlayerId,
     PossessionId,
     TeamSeasonId,
 )
