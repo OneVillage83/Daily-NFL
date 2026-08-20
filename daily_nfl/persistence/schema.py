@@ -84,10 +84,16 @@ CREATE TABLE entity_crosswalk (
     match_method TEXT NOT NULL,
     match_confidence REAL NOT NULL CHECK (match_confidence >= 0.0 AND match_confidence <= 1.0),
     verified INTEGER NOT NULL DEFAULT 0 CHECK (verified IN (0, 1)),
-    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-    UNIQUE(provider_id, provider_entity_type, external_id, valid_from)
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 
+CREATE UNIQUE INDEX uq_crosswalk_external_valid_from
+    ON entity_crosswalk(
+        provider_id,
+        provider_entity_type,
+        external_id,
+        COALESCE(valid_from, '')
+    );
 CREATE INDEX idx_crosswalk_canonical
     ON entity_crosswalk(canonical_entity_type, canonical_entity_id);
 CREATE INDEX idx_crosswalk_external
@@ -231,12 +237,12 @@ CREATE TABLE penalty_observations (
 
 CREATE INDEX idx_penalty_play ON penalty_observations(play_id);
 
-CREATE TABLE game_results (
+CREATE TABLE game_result_observations (
     result_observation_id TEXT PRIMARY KEY,
     game_id TEXT NOT NULL REFERENCES games(game_id),
     evidence_id TEXT REFERENCES raw_evidence(evidence_id),
     provider_id TEXT NOT NULL REFERENCES providers(provider_id),
-    revision INTEGER NOT NULL CHECK (revision >= 1),
+    provider_revision TEXT,
     home_points_final INTEGER NOT NULL CHECK (home_points_final >= 0),
     away_points_final INTEGER NOT NULL CHECK (away_points_final >= 0),
     overtime INTEGER NOT NULL DEFAULT 0 CHECK (overtime IN (0, 1)),
@@ -248,12 +254,40 @@ CREATE TABLE game_results (
     available_at TEXT NOT NULL,
     availability_method TEXT NOT NULL,
     availability_confidence TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+
+CREATE INDEX idx_result_obs_game_provider
+    ON game_result_observations(game_id, provider_id, available_at);
+
+CREATE TABLE game_results (
+    result_id TEXT PRIMARY KEY,
+    game_id TEXT NOT NULL REFERENCES games(game_id),
+    revision INTEGER NOT NULL CHECK (revision >= 1),
+    home_points_final INTEGER NOT NULL CHECK (home_points_final >= 0),
+    away_points_final INTEGER NOT NULL CHECK (away_points_final >= 0),
+    overtime INTEGER NOT NULL DEFAULT 0 CHECK (overtime IN (0, 1)),
+    finalized INTEGER NOT NULL DEFAULT 1 CHECK (finalized IN (0, 1)),
+    reconciliation_method TEXT NOT NULL,
+    reconciliation_confidence REAL NOT NULL
+        CHECK (reconciliation_confidence >= 0.0 AND reconciliation_confidence <= 1.0),
+    derived_at TEXT NOT NULL,
+    available_at TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-    UNIQUE(game_id, provider_id, revision)
+    UNIQUE(game_id, revision)
+);
+
+CREATE TABLE game_result_sources (
+    result_id TEXT NOT NULL REFERENCES game_results(result_id),
+    result_observation_id TEXT NOT NULL
+        REFERENCES game_result_observations(result_observation_id),
+    PRIMARY KEY(result_id, result_observation_id)
 );
 
 CREATE INDEX idx_game_results_game_revision
     ON game_results(game_id, revision);
+CREATE INDEX idx_game_result_sources_observation
+    ON game_result_sources(result_observation_id);
 
 CREATE VIEW current_game_results AS
 SELECT gr.*
@@ -323,6 +357,17 @@ BEGIN
     SELECT RAISE(ABORT, 'penalty_observations is append-only');
 END;
 
+CREATE TRIGGER game_result_observations_no_update
+BEFORE UPDATE ON game_result_observations
+BEGIN
+    SELECT RAISE(ABORT, 'game_result_observations is append-only');
+END;
+CREATE TRIGGER game_result_observations_no_delete
+BEFORE DELETE ON game_result_observations
+BEGIN
+    SELECT RAISE(ABORT, 'game_result_observations is append-only');
+END;
+
 CREATE TRIGGER game_results_no_update
 BEFORE UPDATE ON game_results
 BEGIN
@@ -332,5 +377,16 @@ CREATE TRIGGER game_results_no_delete
 BEFORE DELETE ON game_results
 BEGIN
     SELECT RAISE(ABORT, 'game_results is append-only');
+END;
+
+CREATE TRIGGER game_result_sources_no_update
+BEFORE UPDATE ON game_result_sources
+BEGIN
+    SELECT RAISE(ABORT, 'game_result_sources is append-only');
+END;
+CREATE TRIGGER game_result_sources_no_delete
+BEFORE DELETE ON game_result_sources
+BEGIN
+    SELECT RAISE(ABORT, 'game_result_sources is append-only');
 END;
 """
