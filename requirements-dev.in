@@ -1,0 +1,7 @@
+-c requirements.txt
+-r requirements.in
+
+mypy==2.2.0
+pip-tools==7.5.3
+pytest==9.1.1
+ruff==0.15.20
