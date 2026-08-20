@@ -17,8 +17,14 @@ from daily_nfl.providers.raw_store import RawEvidenceArtifact, RawEvidenceStore
 class StoredAcquisition:
     descriptor: ProviderDescriptor
     request: AcquisitionRequest
-    payload: ProviderPayload
-    artifact: RawEvidenceArtifact
+    payloads: tuple[ProviderPayload, ...]
+    artifacts: tuple[RawEvidenceArtifact, ...]
+
+    def __post_init__(self) -> None:
+        if not self.payloads or not self.artifacts:
+            raise ValueError("stored acquisition requires raw payloads and artifacts")
+        if len(self.payloads) != len(self.artifacts):
+            raise ValueError("raw payload and artifact counts must match")
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,11 +32,14 @@ class AcquisitionService:
     raw_store: RawEvidenceStore
 
     def acquire(self, provider: ProviderAdapter, request: AcquisitionRequest) -> StoredAcquisition:
-        payload = provider.acquire(request)
-        artifact = self.raw_store.put(provider.descriptor.provider_id, request.dataset, payload)
+        payloads = provider.acquire(request)
+        artifacts = tuple(
+            self.raw_store.put(provider.descriptor.provider_id, request.dataset, payload)
+            for payload in payloads
+        )
         return StoredAcquisition(
             descriptor=provider.descriptor,
             request=request,
-            payload=payload,
-            artifact=artifact,
+            payloads=payloads,
+            artifacts=artifacts,
         )
