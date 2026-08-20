@@ -67,7 +67,8 @@ def apply_migrations(connection: sqlite3.Connection) -> int:
             continue
         if migration.version != expected_next:
             raise SchemaVersionError(
-                f"migration sequence gap: expected version {expected_next}, found {migration.version}"
+                "migration sequence gap: "
+                f"expected version {expected_next}, found {migration.version}"
             )
 
         escaped_name = migration.name.replace("'", "''")
