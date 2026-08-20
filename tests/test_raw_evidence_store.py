@@ -54,7 +54,7 @@ def test_filesystem_store_is_content_addressed_and_idempotent(tmp_path: Path) ->
     assert first == second
     assert first.sha256 == sha256_bytes(payload.content)
     assert first.size_bytes == len(payload.content)
-    assert first.relative_path.suffix == ".json"
+    assert first.relative_path.suffix == ".raw"
     assert (store.root / first.relative_path).read_bytes() == payload.content
 
 
