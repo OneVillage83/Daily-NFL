@@ -9,10 +9,10 @@ from pathlib import Path
 from daily_nfl.persistence import (
     SCHEMA_VERSION,
     apply_migrations,
-    connect_database,
     current_schema_version,
     foreign_keys_enabled,
     integrity_ok,
+    open_database,
 )
 
 
@@ -36,7 +36,7 @@ def main() -> int:
     args = parse_args()
     database: Path = args.database
 
-    with connect_database(database) as connection:
+    with open_database(database) as connection:
         before = current_schema_version(connection)
         if args.check:
             after = before
