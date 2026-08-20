@@ -8,14 +8,20 @@ from daily_nfl.domain import (
     AvailabilityMethod,
     DriveId,
     EventId,
+    Franchise,
+    FranchiseId,
     Game,
     GameId,
     GameResult,
     GameResultType,
     KnowledgeTimestamp,
+    Person,
+    PersonId,
     PlayDesignModifier,
     PlayExecution,
     PlayId,
+    Player,
+    PlayerId,
     PlayType,
     Possession,
     PossessionId,
@@ -23,6 +29,7 @@ from daily_nfl.domain import (
     RulesetVersion,
     SeasonPhase,
     SeasonWeek,
+    TeamSeason,
     TeamSeasonId,
     VenueId,
 )
@@ -35,6 +42,28 @@ def _possession() -> Possession:
         offense_team_season_id=TeamSeasonId("team-home-2026"),
         defense_team_season_id=TeamSeasonId("team-away-2026"),
     )
+
+
+def test_franchise_and_team_season_are_distinct_identities() -> None:
+    franchise = Franchise(franchise_id=FranchiseId("franchise-1"))
+    team_season = TeamSeason(
+        team_season_id=TeamSeasonId("franchise-1-2026"),
+        franchise_id=franchise.franchise_id,
+        season=2026,
+    )
+
+    assert team_season.franchise_id == franchise.franchise_id
+    assert team_season.team_season_id != TeamSeasonId(franchise.franchise_id)
+
+
+def test_person_and_player_are_distinct_from_team_membership() -> None:
+    person = Person(person_id=PersonId("person-1"))
+    player = Player(player_id=PlayerId("player-1"), person_id=person.person_id)
+    names = {field.name for field in fields(Player)}
+
+    assert player.person_id == person.person_id
+    assert "team_season_id" not in names
+    assert "provider_id" not in names
 
 
 def test_game_contract_cannot_carry_final_result_fields() -> None:
