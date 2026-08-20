@@ -32,7 +32,7 @@ from daily_nfl.providers.raw_store import (
     sha256_bytes,
 )
 from daily_nfl.providers.registry import ProviderRegistrationError, ProviderRegistry
-from daily_nfl.providers.service import AcquisitionService, StoredAcquisition
+from daily_nfl.providers.service import AcquisitionService, StoredAcquisition, StoredEvidence
 
 __all__ = [
     "AcquisitionRequest",
@@ -57,6 +57,7 @@ __all__ = [
     "RawEvidenceCollisionError",
     "RawEvidenceStore",
     "StoredAcquisition",
+    "StoredEvidence",
     "UnsupportedDatasetError",
     "UnsupportedRawAssetMappingError",
     "evidence_id_for",
