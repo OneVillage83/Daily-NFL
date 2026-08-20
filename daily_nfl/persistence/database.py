@@ -1,8 +1,8 @@
 """SQLite connection and database-status helpers for Daily NFL."""
 
+import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
-import sqlite3
 
 
 @dataclass(frozen=True, slots=True)
