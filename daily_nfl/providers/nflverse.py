@@ -1,8 +1,8 @@
-"""Initial nflverse/nflreadpy provider boundary.
+"""Initial nflverse provider boundary.
 
-The concrete nflreadpy loader is intentionally injected. M3 freezes the
-provider contract before binding Daily NFL to a particular nflreadpy API
-surface or dataset shape.
+The concrete loader is injected. Daily NFL acquires exact upstream artifacts
+before parsing them, while nflreadpy remains a schema/API reference and later
+parity-validation tool rather than the owner of raw evidence.
 """
 
 from __future__ import annotations
@@ -25,12 +25,12 @@ class UnsupportedDatasetError(ValueError):
     """Raised when an adapter is asked for a dataset it did not declare."""
 
 
-NflverseLoader = Callable[[AcquisitionRequest], ProviderPayload]
+NflverseLoader = Callable[[AcquisitionRequest], tuple[ProviderPayload, ...]]
 
 
 NFLVERSE_DESCRIPTOR = ProviderDescriptor(
     provider_id="nflverse",
-    name="nflverse / nflreadpy",
+    name="nflverse / nflreadpy ecosystem",
     provider_type="OPEN_SOURCE_FOUNDATION",
     parser_version="NFLVERSE_ADAPTER_V1",
     capabilities=tuple(
@@ -57,14 +57,17 @@ NFLVERSE_DESCRIPTOR = ProviderDescriptor(
 
 @dataclass(frozen=True, slots=True)
 class NflverseAdapter:
-    """Provider adapter whose concrete loader is supplied at the integration edge."""
+    """Provider adapter whose concrete raw loader lives at the integration edge."""
 
     loader: NflverseLoader
     descriptor: ProviderDescriptor = NFLVERSE_DESCRIPTOR
 
-    def acquire(self, request: AcquisitionRequest) -> ProviderPayload:
+    def acquire(self, request: AcquisitionRequest) -> tuple[ProviderPayload, ...]:
         if self.descriptor.capability_for(request.dataset) is None:
             raise UnsupportedDatasetError(
                 f"nflverse adapter does not declare support for {request.dataset.value}"
             )
-        return self.loader(request)
+        payloads = self.loader(request)
+        if not payloads:
+            raise ValueError("provider loader returned no raw payloads")
+        return payloads
