@@ -6,29 +6,24 @@ import pytest
 from daily_nfl.persistence import (
     SCHEMA_VERSION,
     apply_migrations,
-    connect_database,
     current_schema_version,
     foreign_keys_enabled,
     integrity_ok,
+    open_database,
 )
-
-
-def _new_database(path: Path) -> sqlite3.Connection:
-    connection = connect_database(path)
-    apply_migrations(connection)
-    return connection
 
 
 def test_clean_database_initializes_to_current_schema(tmp_path: Path) -> None:
     database = tmp_path / "daily-nfl.db"
 
-    with _new_database(database) as connection:
+    with open_database(database) as connection:
+        apply_migrations(connection)
         assert current_schema_version(connection) == SCHEMA_VERSION
         assert foreign_keys_enabled(connection)
         assert integrity_ok(connection)
 
         tables = {
-            row[0]
+            str(row[0])
             for row in connection.execute(
                 "SELECT name FROM sqlite_master WHERE type='table'"
             ).fetchall()
@@ -50,14 +45,16 @@ def test_clean_database_initializes_to_current_schema(tmp_path: Path) -> None:
             "play_observations",
             "participation_observations",
             "penalty_observations",
+            "game_result_observations",
             "game_results",
+            "game_result_sources",
         }.issubset(tables)
 
 
 def test_migrations_are_idempotent(tmp_path: Path) -> None:
     database = tmp_path / "daily-nfl.db"
 
-    with connect_database(database) as connection:
+    with open_database(database) as connection:
         first = apply_migrations(connection)
         second = apply_migrations(connection)
 
@@ -71,7 +68,8 @@ def test_migrations_are_idempotent(tmp_path: Path) -> None:
 def test_foreign_keys_are_enforced(tmp_path: Path) -> None:
     database = tmp_path / "daily-nfl.db"
 
-    with _new_database(database) as connection:
+    with open_database(database) as connection:
+        apply_migrations(connection)
         with pytest.raises(sqlite3.IntegrityError):
             connection.execute(
                 "INSERT INTO team_seasons(team_season_id, franchise_id, season) "
@@ -83,7 +81,8 @@ def test_foreign_keys_are_enforced(tmp_path: Path) -> None:
 def test_raw_evidence_is_append_only(tmp_path: Path) -> None:
     database = tmp_path / "daily-nfl.db"
 
-    with _new_database(database) as connection:
+    with open_database(database) as connection:
+        apply_migrations(connection)
         connection.execute(
             "INSERT INTO providers(provider_id, name, provider_type) VALUES (?, ?, ?)",
             ("provider-1", "Fixture Provider", "TEST"),
@@ -130,10 +129,13 @@ def test_raw_evidence_is_append_only(tmp_path: Path) -> None:
             )
 
 
-def test_game_results_preserve_revisions_and_current_view(tmp_path: Path) -> None:
+def test_game_results_preserve_observations_canonical_revisions_and_sources(
+    tmp_path: Path,
+) -> None:
     database = tmp_path / "daily-nfl.db"
 
-    with _new_database(database) as connection:
+    with open_database(database) as connection:
+        apply_migrations(connection)
         connection.execute(
             "INSERT INTO providers(provider_id, name, provider_type) VALUES (?, ?, ?)",
             ("provider-1", "Fixture Provider", "TEST"),
@@ -182,13 +184,15 @@ def test_game_results_preserve_revisions_and_current_view(tmp_path: Path) -> Non
         )
 
         for revision, home_points in ((1, 27), (2, 28)):
+            observation_id = f"provider-result-{revision}"
+            result_id = f"canonical-result-{revision}"
             connection.execute(
                 """
-                INSERT INTO game_results(
+                INSERT INTO game_result_observations(
                     result_observation_id,
                     game_id,
                     provider_id,
-                    revision,
+                    provider_revision,
                     home_points_final,
                     away_points_final,
                     ingested_at,
@@ -198,10 +202,10 @@ def test_game_results_preserve_revisions_and_current_view(tmp_path: Path) -> Non
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    f"result-{revision}",
+                    observation_id,
                     "game-1",
                     "provider-1",
-                    revision,
+                    str(revision),
                     home_points,
                     24,
                     "2026-09-11T00:00:00Z",
@@ -210,21 +214,57 @@ def test_game_results_preserve_revisions_and_current_view(tmp_path: Path) -> Non
                     "HIGH",
                 ),
             )
+            connection.execute(
+                """
+                INSERT INTO game_results(
+                    result_id,
+                    game_id,
+                    revision,
+                    home_points_final,
+                    away_points_final,
+                    reconciliation_method,
+                    reconciliation_confidence,
+                    derived_at,
+                    available_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    result_id,
+                    "game-1",
+                    revision,
+                    home_points,
+                    24,
+                    "SINGLE_SOURCE",
+                    1.0,
+                    "2026-09-11T00:00:00Z",
+                    "2026-09-11T00:00:00Z",
+                ),
+            )
+            connection.execute(
+                "INSERT INTO game_result_sources(result_id, result_observation_id) VALUES (?, ?)",
+                (result_id, observation_id),
+            )
 
-        rows = connection.execute(
+        canonical_rows = connection.execute(
             "SELECT revision, home_points_final FROM game_results ORDER BY revision"
         ).fetchall()
+        observation_count = connection.execute(
+            "SELECT COUNT(*) FROM game_result_observations"
+        ).fetchone()
+        source_count = connection.execute("SELECT COUNT(*) FROM game_result_sources").fetchone()
         current = connection.execute(
             "SELECT revision, home_points_final FROM current_game_results WHERE game_id = ?",
             ("game-1",),
         ).fetchone()
 
-        assert [(row[0], row[1]) for row in rows] == [(1, 27), (2, 28)]
+        assert [(row[0], row[1]) for row in canonical_rows] == [(1, 27), (2, 28)]
+        assert observation_count is not None and observation_count[0] == 2
+        assert source_count is not None and source_count[0] == 2
         assert current is not None
         assert (current[0], current[1]) == (2, 28)
 
         with pytest.raises(sqlite3.IntegrityError, match="append-only"):
             connection.execute(
-                "UPDATE game_results SET home_points_final = 30 WHERE result_observation_id = ?",
-                ("result-1",),
+                "UPDATE game_results SET home_points_final = 30 WHERE result_id = ?",
+                ("canonical-result-1",),
             )
