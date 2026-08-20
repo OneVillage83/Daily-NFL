@@ -1,6 +1,8 @@
 """SQLite connection and database-status helpers for Daily NFL."""
 
 import sqlite3
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -24,6 +26,21 @@ def connect_database(path: str | Path) -> sqlite3.Connection:
     connection.execute("PRAGMA foreign_keys = ON")
     connection.execute("PRAGMA busy_timeout = 5000")
     return connection
+
+
+@contextmanager
+def open_database(path: str | Path) -> Iterator[sqlite3.Connection]:
+    """Open, transaction-manage, and always close a Daily NFL database."""
+    connection = connect_database(path)
+    try:
+        yield connection
+        connection.commit()
+    except BaseException:
+        if connection.in_transaction:
+            connection.rollback()
+        raise
+    finally:
+        connection.close()
 
 
 def foreign_keys_enabled(connection: sqlite3.Connection) -> bool:
