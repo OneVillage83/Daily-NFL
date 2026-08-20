@@ -2,6 +2,6 @@
 -r requirements.in
 
 mypy==2.2.0
-pip-tools==7.5.3
+pip-tools==7.6.0
 pytest==9.1.1
 ruff==0.15.20
