@@ -17,6 +17,7 @@ from daily_nfl.domain.enums import (
     SeasonPhase,
 )
 from daily_nfl.domain.game import Game, GameResult, RulesetVersion, SeasonWeek
+from daily_nfl.domain.identity import Franchise, Person, Player, TeamSeason
 from daily_nfl.domain.ids import (
     DriveId,
     EventId,
@@ -48,6 +49,7 @@ __all__ = [
     "AvailabilityMethod",
     "DriveId",
     "EventId",
+    "Franchise",
     "FranchiseId",
     "Game",
     "GameId",
@@ -60,6 +62,7 @@ __all__ = [
     "Penalty",
     "PenaltyDisposition",
     "Period",
+    "Person",
     "PersonId",
     "PlayDesignModifier",
     "PlayEvent",
@@ -70,6 +73,7 @@ __all__ = [
     "PlayResult",
     "PlayStateAfter",
     "PlayType",
+    "Player",
     "PlayerId",
     "Possession",
     "PossessionId",
@@ -77,6 +81,7 @@ __all__ = [
     "RulesetVersion",
     "SeasonPhase",
     "SeasonWeek",
+    "TeamSeason",
     "TeamSeasonId",
     "VenueId",
 ]
