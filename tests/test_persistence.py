@@ -1,5 +1,5 @@
-from pathlib import Path
 import sqlite3
+from pathlib import Path
 
 import pytest
 
@@ -63,8 +63,9 @@ def test_migrations_are_idempotent(tmp_path: Path) -> None:
 
         assert first == SCHEMA_VERSION
         assert second == SCHEMA_VERSION
-        count = connection.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0]
-        assert count == SCHEMA_VERSION
+        row = connection.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()
+        assert row is not None
+        assert row[0] == SCHEMA_VERSION
 
 
 def test_foreign_keys_are_enforced(tmp_path: Path) -> None:
