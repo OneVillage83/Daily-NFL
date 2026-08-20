@@ -53,9 +53,7 @@ def test_http_loader_returns_exact_response_bytes_without_parsing() -> None:
 
     before = datetime.now(UTC)
     with patch("daily_nfl.providers.nflverse_http.urlopen", return_value=response):
-        payloads = NflverseHttpLoader().acquire(
-            AcquisitionRequest(dataset=DatasetKind.SCHEDULE)
-        ) if False else NflverseHttpLoader()(AcquisitionRequest(dataset=DatasetKind.SCHEDULE))
+        payloads = NflverseHttpLoader()(AcquisitionRequest(dataset=DatasetKind.SCHEDULE))
     after = datetime.now(UTC)
 
     assert len(payloads) == 1
