@@ -44,18 +44,6 @@ def evidence_id_for(provider_id: str, dataset: DatasetKind, content_sha256: str)
     return hashlib.sha256(identity).hexdigest()
 
 
-def _suffix_for(content_type: str) -> str:
-    normalized = content_type.partition(";")[0].strip().lower()
-    return {
-        "application/json": ".json",
-        "application/x-ndjson": ".ndjson",
-        "text/csv": ".csv",
-        "application/csv": ".csv",
-        "application/parquet": ".parquet",
-        "application/vnd.apache.parquet": ".parquet",
-    }.get(normalized, ".bin")
-
-
 def _validate_provider_id(provider_id: str) -> None:
     if not provider_id.strip():
         raise ValueError("provider_id cannot be blank")
@@ -75,11 +63,7 @@ class FileSystemRawEvidenceStore:
     ) -> RawEvidenceArtifact:
         _validate_provider_id(provider_id)
         digest = sha256_bytes(payload.content)
-        relative_path = (
-            Path(provider_id)
-            / dataset.value.lower()
-            / f"{digest}{_suffix_for(payload.content_type)}"
-        )
+        relative_path = Path(provider_id) / dataset.value.lower() / f"{digest}.raw"
         object_path = self.root / relative_path
         object_path.parent.mkdir(parents=True, exist_ok=True)
 
