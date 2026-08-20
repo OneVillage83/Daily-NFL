@@ -7,8 +7,8 @@ layers may populate these objects, but they must not redefine their semantics.
 from daily_nfl.domain.enums import (
     AvailabilityConfidence,
     AvailabilityMethod,
-    GameStatus,
     GameResultType,
+    GameStatus,
     ParticipationSide,
     PenaltyDisposition,
     PlayDesignModifier,
@@ -33,10 +33,12 @@ from daily_nfl.domain.ids import (
 from daily_nfl.domain.play import (
     Participation,
     Penalty,
+    Period,
     PlayEvent,
     PlayExecution,
     PlayResult,
     PlayStateAfter,
+    Possession,
     PrePlayState,
 )
 from daily_nfl.domain.temporal import KnowledgeTimestamp
@@ -57,6 +59,7 @@ __all__ = [
     "ParticipationSide",
     "Penalty",
     "PenaltyDisposition",
+    "Period",
     "PersonId",
     "PlayDesignModifier",
     "PlayEvent",
@@ -68,6 +71,7 @@ __all__ = [
     "PlayStateAfter",
     "PlayType",
     "PlayerId",
+    "Possession",
     "PossessionId",
     "PrePlayState",
     "RulesetVersion",
