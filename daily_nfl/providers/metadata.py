@@ -14,7 +14,7 @@ class ProviderMetadataConflictError(RuntimeError):
 
 
 class RawEvidenceMetadataConflictError(RuntimeError):
-    """Raised when an evidence ID already exists with conflicting immutable metadata."""
+    """Raised when an evidence ID conflicts on immutable content identity."""
 
 
 def _iso(value: datetime | None) -> str | None:
@@ -112,30 +112,14 @@ def _raw_metadata_values(
     )
 
 
-def _assert_existing_raw_metadata_matches(
+def _assert_existing_raw_identity_matches(
     connection: sqlite3.Connection,
     evidence_id: str,
     expected: tuple[object, ...],
 ) -> None:
     row = connection.execute(
         """
-        SELECT
-            evidence_id,
-            provider_id,
-            endpoint_category,
-            source_uri,
-            content_type,
-            sha256,
-            object_path,
-            effective_at,
-            published_at,
-            observed_at,
-            ingested_at,
-            available_at,
-            availability_method,
-            availability_confidence,
-            provider_schema_version,
-            parser_version
+        SELECT evidence_id, provider_id, endpoint_category, sha256, object_path
         FROM raw_evidence
         WHERE evidence_id = ?
         """,
@@ -143,10 +127,12 @@ def _assert_existing_raw_metadata_matches(
     ).fetchone()
     if row is None:
         return
-    actual = tuple(row[index] for index in range(len(expected)))
-    if actual != expected:
+
+    expected_identity = (expected[0], expected[1], expected[2], expected[5], expected[6])
+    actual_identity = tuple(row[index] for index in range(len(expected_identity)))
+    if actual_identity != expected_identity:
         raise RawEvidenceMetadataConflictError(
-            f"evidence_id {evidence_id!r} already exists with conflicting metadata"
+            f"evidence_id {evidence_id!r} already exists with conflicting content identity"
         )
 
 
@@ -164,7 +150,7 @@ def record_stored_acquisition(
             (evidence_id,),
         ).fetchone()
         if existing is not None:
-            _assert_existing_raw_metadata_matches(connection, evidence_id, values)
+            _assert_existing_raw_identity_matches(connection, evidence_id, values)
             continue
 
         connection.execute(
