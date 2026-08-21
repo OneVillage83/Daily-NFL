@@ -1,5 +1,9 @@
 """Canonical identity generation and provider reconciliation for Daily NFL."""
 
+from daily_nfl.reconciliation.authorities import (
+    GSIS_AUTHORITY_DESCRIPTOR,
+    GSIS_AUTHORITY_PROVIDER_ID,
+)
 from daily_nfl.reconciliation.canonical import (
     game_id_for_event,
     new_event_id,
@@ -40,6 +44,8 @@ __all__ = [
     "ExternalIdentity",
     "FRANCHISE_ENTITY_TYPE",
     "GAME_ENTITY_TYPE",
+    "GSIS_AUTHORITY_DESCRIPTOR",
+    "GSIS_AUTHORITY_PROVIDER_ID",
     "GSIS_PLAYER_ENTITY_TYPE",
     "GameIdentityHint",
     "IdentityCandidate",
