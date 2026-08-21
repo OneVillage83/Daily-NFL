@@ -1,4 +1,6 @@
 import sqlite3
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from uuid import UUID
 
@@ -19,12 +21,13 @@ from daily_nfl.reconciliation import (
 )
 
 
-def _open_identity_database(path: Path) -> sqlite3.Connection:
-    connection = open_database(path)
-    apply_migrations(connection)
-    record_provider(connection, NFLVERSE_DESCRIPTOR)
-    record_provider(connection, GSIS_AUTHORITY_DESCRIPTOR)
-    return connection
+@contextmanager
+def _open_identity_database(path: Path) -> Iterator[sqlite3.Connection]:
+    with open_database(path) as connection:
+        apply_migrations(connection)
+        record_provider(connection, NFLVERSE_DESCRIPTOR)
+        record_provider(connection, GSIS_AUTHORITY_DESCRIPTOR)
+        yield connection
 
 
 def test_gsis_bootstraps_opaque_player_once_and_reuses_crosswalk(tmp_path: Path) -> None:
