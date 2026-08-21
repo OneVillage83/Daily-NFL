@@ -6,11 +6,11 @@ import pytest
 from daily_nfl.domain import AvailabilityConfidence, AvailabilityMethod
 from daily_nfl.persistence import apply_migrations, open_database
 from daily_nfl.providers import (
+    NFLVERSE_DESCRIPTOR,
     AcquisitionRequest,
     AcquisitionService,
     DatasetKind,
     FileSystemRawEvidenceStore,
-    NFLVERSE_DESCRIPTOR,
     NflverseAdapter,
     ProviderDescriptor,
     ProviderMetadataConflictError,
