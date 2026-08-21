@@ -5,12 +5,16 @@ from daily_nfl.reconciliation.authorities import (
     GSIS_AUTHORITY_PROVIDER_ID,
 )
 from daily_nfl.reconciliation.canonical import (
+    drive_id_for,
     game_id_for_event,
     new_event_id,
     new_franchise_id,
     new_person_id,
     new_reconciliation_decision_id,
+    play_event_id_for,
+    play_id_for,
     player_id_for_person,
+    possession_id_for,
     team_season_id_for,
 )
 from daily_nfl.reconciliation.contracts import (
@@ -57,11 +61,15 @@ __all__ = [
     "ReconciliationReason",
     "ReconciliationStatus",
     "TEAM_SEASON_ENTITY_TYPE",
+    "drive_id_for",
     "game_id_for_event",
     "new_event_id",
     "new_franchise_id",
     "new_person_id",
     "new_reconciliation_decision_id",
+    "play_event_id_for",
+    "play_id_for",
     "player_id_for_person",
+    "possession_id_for",
     "team_season_id_for",
 ]
