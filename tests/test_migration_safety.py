@@ -85,6 +85,8 @@ def test_observation_tables_have_append_only_triggers(tmp_path: Path) -> None:
     triggers = {str(row[0]) for row in trigger_rows}
     protected_tables = {
         "raw_evidence",
+        "raw_evidence_observations",
+        "provider_capability_snapshots",
         "schedule_observations",
         "play_observations",
         "participation_observations",
