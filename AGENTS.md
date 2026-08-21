@@ -108,6 +108,8 @@ Do not copy MLB-specific domain code into Daily-NFL merely for convenience.
 - `requirements.in` and `requirements-dev.in` are the authoritative direct dependency inputs.
 - `requirements.txt` and `requirements-dev.txt` are generated lock artifacts and must not be hand-edited.
 - Regenerate locks under Python 3.12 whenever an input file changes.
+- Use the pinned lock compiler toolchain from the repository dependency inputs. The current M0 compiler pair is `pip==26.1.2` with `pip-tools==7.6.0`.
+- Do not run an unpinned `pip install --upgrade pip` before lock compilation; `pip-tools` depends on pip internal APIs and an unsupported pip upgrade can make the compiler non-reproducible or unusable.
 - Keep generated hashes and transitive dependencies intact.
 - Validate a clean environment with `python -m pip install --require-hashes -r requirements-dev.txt`.
 - A milestone that depends on a changed dependency is not reproducibly closed until its compiled lock is refreshed and the quality gate passes from that lock.
