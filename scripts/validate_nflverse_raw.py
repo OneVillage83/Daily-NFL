@@ -19,8 +19,8 @@ from daily_nfl.providers import (  # noqa: E402
     FileSystemRawEvidenceStore,
     NflverseAdapter,
     NflverseHttpLoader,
-    sha256_bytes,
     record_stored_acquisition,
+    sha256_bytes,
 )
 
 
