@@ -75,6 +75,11 @@ def _payload(bundle: NormalizedPlayBundle) -> dict[str, object]:
             "play_id": str(pre.play_id),
             "drive_id": str(pre.drive_id) if pre.drive_id is not None else None,
             "possession_id": str(pre.possession.possession_id),
+            "possession_segment_id": (
+                str(pre.possession_segment_id)
+                if pre.possession_segment_id is not None
+                else None
+            ),
             "offense_team_season_id": str(pre.possession.offense_team_season_id),
             "defense_team_season_id": str(pre.possession.defense_team_season_id),
             "period": pre.period.number,
@@ -108,6 +113,7 @@ def _payload(bundle: NormalizedPlayBundle) -> dict[str, object]:
         ],
         "participation": [
             {
+                "participation_id": str(item.participation_id),
                 "player_id": str(item.player_id),
                 "team_season_id": str(item.team_season_id),
                 "side": item.side.value,
@@ -118,6 +124,7 @@ def _payload(bundle: NormalizedPlayBundle) -> dict[str, object]:
         ],
         "penalties": [
             {
+                "penalty_id": str(penalty.penalty_id),
                 "team_season_id": str(penalty.team_season_id),
                 "player_id": str(penalty.player_id) if penalty.player_id is not None else None,
                 "penalty_type": penalty.penalty_type,
@@ -183,12 +190,46 @@ def serialize_normalized_play(bundle: NormalizedPlayBundle) -> tuple[str, str]:
     return payload_json, hashlib.sha256(payload_json.encode()).hexdigest()
 
 
+def _ensure_child_identity(
+    connection: sqlite3.Connection,
+    *,
+    table: str,
+    id_column: str,
+    canonical_id: str,
+    play_id: str,
+    sequence: int,
+) -> None:
+    connection.execute(
+        f"""
+        INSERT INTO {table}({id_column}, play_id, canonical_sequence)
+        VALUES (?, ?, ?)
+        ON CONFLICT({id_column}) DO NOTHING
+        """,
+        (canonical_id, play_id, sequence),
+    )
+    row = connection.execute(
+        f"SELECT play_id, canonical_sequence FROM {table} WHERE {id_column} = ?",
+        (canonical_id,),
+    ).fetchone()
+    expected = (play_id, sequence)
+    if row is None or tuple(row) != expected:
+        raise NormalizedPlayConflictError(f"canonical {table} identity conflicts with stored facts")
+
+
 def _ensure_canonical_rows(
     connection: sqlite3.Connection,
     bundle: NormalizedPlayBundle,
 ) -> None:
     pre = bundle.pre_play_state
     possession = pre.possession
+    segment_id = pre.possession_segment_id
+    if segment_id is None:
+        raise NormalizedPlayConflictError(
+            "canonical normalized play requires possession_segment_id"
+        )
+
+    # Retain the original possession relation for backward compatibility while
+    # persisting the certified F-5 possession-segment identity separately.
     connection.execute(
         """
         INSERT INTO possessions(
@@ -222,11 +263,54 @@ def _ensure_canonical_rows(
     if possession_row is None or tuple(possession_row) != expected_possession:
         raise NormalizedPlayConflictError("canonical possession conflicts with stored facts")
 
+    connection.execute(
+        """
+        INSERT INTO possession_segments(
+            possession_segment_id,
+            game_id,
+            canonical_sequence,
+            offense_team_season_id,
+            defense_team_season_id
+        ) VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(possession_segment_id) DO NOTHING
+        """,
+        (
+            str(segment_id),
+            str(bundle.game_id),
+            bundle.possession_sequence,
+            str(possession.offense_team_season_id),
+            str(possession.defense_team_season_id),
+        ),
+    )
+    segment_row = connection.execute(
+        """
+        SELECT game_id, canonical_sequence, offense_team_season_id, defense_team_season_id
+        FROM possession_segments
+        WHERE possession_segment_id = ?
+        """,
+        (str(segment_id),),
+    ).fetchone()
+    expected_segment = (
+        str(bundle.game_id),
+        bundle.possession_sequence,
+        str(possession.offense_team_season_id),
+        str(possession.defense_team_season_id),
+    )
+    if segment_row is None or tuple(segment_row) != expected_segment:
+        raise NormalizedPlayConflictError(
+            "canonical possession segment conflicts with stored facts"
+        )
+
     if pre.drive_id is not None:
         connection.execute(
             """
-            INSERT INTO drives(drive_id, game_id, possession_id, canonical_sequence)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO drives(
+                drive_id,
+                game_id,
+                possession_id,
+                canonical_sequence,
+                possession_segment_id
+            ) VALUES (?, ?, ?, ?, ?)
             ON CONFLICT(drive_id) DO NOTHING
             """,
             (
@@ -234,24 +318,36 @@ def _ensure_canonical_rows(
                 str(bundle.game_id),
                 str(possession.possession_id),
                 bundle.drive_sequence,
+                str(segment_id),
             ),
         )
         drive_row = connection.execute(
-            "SELECT game_id, possession_id, canonical_sequence FROM drives WHERE drive_id = ?",
+            """
+            SELECT game_id, possession_id, canonical_sequence, possession_segment_id
+            FROM drives
+            WHERE drive_id = ?
+            """,
             (str(pre.drive_id),),
         ).fetchone()
         expected_drive = (
             str(bundle.game_id),
             str(possession.possession_id),
             bundle.drive_sequence,
+            str(segment_id),
         )
         if drive_row is None or tuple(drive_row) != expected_drive:
             raise NormalizedPlayConflictError("canonical drive conflicts with stored facts")
 
     connection.execute(
         """
-        INSERT INTO plays(play_id, game_id, drive_id, possession_id, canonical_sequence)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO plays(
+            play_id,
+            game_id,
+            drive_id,
+            possession_id,
+            canonical_sequence,
+            possession_segment_id
+        ) VALUES (?, ?, ?, ?, ?, ?)
         ON CONFLICT(play_id) DO NOTHING
         """,
         (
@@ -260,10 +356,15 @@ def _ensure_canonical_rows(
             str(pre.drive_id) if pre.drive_id is not None else None,
             str(possession.possession_id),
             bundle.canonical_sequence,
+            str(segment_id),
         ),
     )
     play_row = connection.execute(
-        "SELECT game_id, drive_id, possession_id, canonical_sequence FROM plays WHERE play_id = ?",
+        """
+        SELECT game_id, drive_id, possession_id, canonical_sequence, possession_segment_id
+        FROM plays
+        WHERE play_id = ?
+        """,
         (str(pre.play_id),),
     ).fetchone()
     expected_play = (
@@ -271,14 +372,49 @@ def _ensure_canonical_rows(
         str(pre.drive_id) if pre.drive_id is not None else None,
         str(possession.possession_id),
         bundle.canonical_sequence,
+        str(segment_id),
     )
     if play_row is None or tuple(play_row) != expected_play:
         raise NormalizedPlayConflictError("canonical play conflicts with stored facts")
 
+    play_id = str(pre.play_id)
+    for event in bundle.events:
+        _ensure_child_identity(
+            connection,
+            table="play_events",
+            id_column="play_event_id",
+            canonical_id=str(event.play_event_id),
+            play_id=play_id,
+            sequence=event.sequence,
+        )
+    for sequence, item in enumerate(bundle.participation, start=1):
+        _ensure_child_identity(
+            connection,
+            table="participations",
+            id_column="participation_id",
+            canonical_id=str(item.participation_id),
+            play_id=play_id,
+            sequence=sequence,
+        )
+    for sequence, penalty in enumerate(bundle.penalties, start=1):
+        _ensure_child_identity(
+            connection,
+            table="penalties",
+            id_column="penalty_id",
+            canonical_id=str(penalty.penalty_id),
+            play_id=play_id,
+            sequence=sequence,
+        )
+
+
+def _participation_observation_id(observation_id: str, sequence: int) -> str:
+    digest = hashlib.sha256(f"{observation_id}|participation|{sequence}".encode()).hexdigest()
+    return f"pao_{digest}"
+
 
 def _penalty_observation_id(observation_id: str, sequence: int) -> str:
     digest = hashlib.sha256(f"{observation_id}|penalty|{sequence}".encode()).hexdigest()
-    return f"pen_{digest}"
+    return f"peo_{digest}"
 
 
 def record_normalized_play(
@@ -355,11 +491,58 @@ def record_normalized_play(
         ),
     )
 
+    for sequence, item in enumerate(bundle.participation, start=1):
+        connection.execute(
+            """
+            INSERT INTO participation_observations(
+                observation_id,
+                participation_id,
+                play_id,
+                player_id,
+                team_season_id,
+                evidence_id,
+                provider_id,
+                side,
+                role,
+                on_field,
+                effective_at,
+                published_at,
+                observed_at,
+                ingested_at,
+                available_at,
+                availability_method,
+                availability_confidence,
+                provider_revision
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                _participation_observation_id(provenance.observation_id, sequence),
+                str(item.participation_id),
+                str(item.play_id),
+                str(item.player_id),
+                str(item.team_season_id),
+                provenance.evidence_id,
+                bundle.provider_id,
+                item.side.value,
+                item.role,
+                int(item.on_field),
+                _iso(knowledge.effective_at),
+                _iso(knowledge.published_at),
+                _iso(knowledge.observed_at),
+                _iso(knowledge.ingested_at),
+                _iso(knowledge.available_at),
+                knowledge.availability_method.value,
+                knowledge.availability_confidence.value,
+                provenance.provider_revision,
+            ),
+        )
+
     for sequence, penalty in enumerate(bundle.penalties, start=1):
         connection.execute(
             """
             INSERT INTO penalty_observations(
                 observation_id,
+                penalty_id,
                 play_id,
                 team_season_id,
                 player_id,
@@ -372,15 +555,19 @@ def record_normalized_play(
                 loss_of_down,
                 nullifies_play,
                 enforcement_spot,
+                effective_at,
+                published_at,
                 observed_at,
                 ingested_at,
                 available_at,
                 availability_method,
-                availability_confidence
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                availability_confidence,
+                provider_revision
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 _penalty_observation_id(provenance.observation_id, sequence),
+                str(penalty.penalty_id),
                 str(penalty.play_id),
                 str(penalty.team_season_id),
                 str(penalty.player_id) if penalty.player_id is not None else None,
@@ -393,10 +580,13 @@ def record_normalized_play(
                 int(penalty.loss_of_down),
                 int(penalty.nullifies_play),
                 penalty.enforcement_spot,
+                _iso(knowledge.effective_at),
+                _iso(knowledge.published_at),
                 _iso(knowledge.observed_at),
                 _iso(knowledge.ingested_at),
                 _iso(knowledge.available_at),
                 knowledge.availability_method.value,
                 knowledge.availability_confidence.value,
+                provenance.provider_revision,
             ),
         )

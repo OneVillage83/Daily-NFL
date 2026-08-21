@@ -19,6 +19,8 @@ from daily_nfl.reconciliation import (
     team_season_id_for,
 )
 
+COMPETITION_ID = "core-competition-nfl"
+
 
 def _insert_game(connection: sqlite3.Connection) -> tuple[GameId, datetime]:
     repository = IdentityRepository(connection)
@@ -44,8 +46,9 @@ def _insert_game(connection: sqlite3.Connection) -> tuple[GameId, datetime]:
             ruleset_version,
             home_team_season_id,
             away_team_season_id,
-            scheduled_kickoff
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            scheduled_kickoff,
+            competition_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             str(game_id),
@@ -57,6 +60,7 @@ def _insert_game(connection: sqlite3.Connection) -> tuple[GameId, datetime]:
             str(home_team),
             str(away_team),
             kickoff.isoformat(),
+            COMPETITION_ID,
         ),
     )
     return game_id, kickoff
@@ -134,6 +138,7 @@ def test_version_two_database_migrates_to_pit_schema(tmp_path: Path) -> None:
         "pit_snapshots",
         "pit_snapshot_inputs",
         "pit_snapshot_seals",
+        "possession_segments",
     }.issubset(tables)
 
 

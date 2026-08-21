@@ -29,6 +29,8 @@ from daily_nfl.reconciliation import (
     team_season_id_for,
 )
 
+COMPETITION_ID = "core-competition-nfl"
+
 
 def _context_and_game(connection: sqlite3.Connection) -> NflverseGameContext:
     repository = IdentityRepository(connection)
@@ -53,8 +55,9 @@ def _context_and_game(connection: sqlite3.Connection) -> NflverseGameContext:
             ruleset_version,
             home_team_season_id,
             away_team_season_id,
-            scheduled_kickoff
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            scheduled_kickoff,
+            competition_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             str(game_id),
@@ -66,6 +69,7 @@ def _context_and_game(connection: sqlite3.Connection) -> NflverseGameContext:
             str(home_team),
             str(away_team),
             "2026-09-13T20:20:00+00:00",
+            COMPETITION_ID,
         ),
     )
     return NflverseGameContext(
@@ -108,6 +112,8 @@ def _knowledge(offset_seconds: int = 0) -> KnowledgeTimestamp:
     )
     return KnowledgeTimestamp(
         available_at=observed,
+        effective_at=observed - timedelta(seconds=30),
+        published_at=observed - timedelta(seconds=5),
         observed_at=observed,
         ingested_at=observed + timedelta(seconds=1),
         availability_method=AvailabilityMethod.OUR_OBSERVATION_TIME,
@@ -145,12 +151,28 @@ def test_normalized_play_persistence_is_idempotent_and_provider_neutral(tmp_path
         record_normalized_play(connection, bundle, provenance)
 
         assert connection.execute("SELECT COUNT(*) FROM possessions").fetchone()[0] == 1
+        assert connection.execute("SELECT COUNT(*) FROM possession_segments").fetchone()[0] == 1
         assert connection.execute("SELECT COUNT(*) FROM drives").fetchone()[0] == 1
         assert connection.execute("SELECT COUNT(*) FROM plays").fetchone()[0] == 1
+        assert connection.execute("SELECT COUNT(*) FROM play_events").fetchone()[0] == 4
+        assert connection.execute("SELECT COUNT(*) FROM penalties").fetchone()[0] == 1
         assert connection.execute("SELECT COUNT(*) FROM play_observations").fetchone()[0] == 1
         assert connection.execute("SELECT COUNT(*) FROM penalty_observations").fetchone()[0] == 1
         row = connection.execute(
             "SELECT play_id, normalized_payload_json FROM play_observations"
+        ).fetchone()
+        penalty_row = connection.execute(
+            """
+            SELECT penalty_id, effective_at, published_at, provider_revision
+            FROM penalty_observations
+            """
+        ).fetchone()
+        relation_row = connection.execute(
+            """
+            SELECT d.possession_segment_id, p.possession_segment_id
+            FROM drives d
+            JOIN plays p ON p.drive_id = d.drive_id
+            """
         ).fetchone()
 
     assert row is not None
@@ -158,7 +180,16 @@ def test_normalized_play_persistence_is_idempotent_and_provider_neutral(tmp_path
     payload = json.loads(str(row[1]))
     assert payload["contract_version"] == "NFL_CANONICAL_PLAY_V1"
     assert payload["execution"]["primary_play_type"] == "PASS"
+    assert payload["pre_play_state"]["possession_segment_id"] is not None
+    assert payload["penalties"][0]["penalty_id"] is not None
     assert "pass_attempt" not in payload
+    assert penalty_row is not None
+    assert penalty_row[0] == payload["penalties"][0]["penalty_id"]
+    assert penalty_row[1] == "2026-09-13T18:59:30Z"
+    assert penalty_row[2] == "2026-09-13T18:59:55Z"
+    assert penalty_row[3] == "r1"
+    assert relation_row is not None
+    assert relation_row[0] == relation_row[1]
 
 
 def test_provider_revision_adds_observation_without_replacing_canonical_play(
@@ -199,6 +230,9 @@ def test_provider_revision_adds_observation_without_replacing_canonical_play(
         record_normalized_play(connection, corrected, corrected_provenance)
 
         play_count = connection.execute("SELECT COUNT(*) FROM plays").fetchone()[0]
+        segment_count = connection.execute(
+            "SELECT COUNT(*) FROM possession_segments"
+        ).fetchone()[0]
         observations = connection.execute(
             """
             SELECT provider_revision, normalized_payload_json
@@ -208,6 +242,7 @@ def test_provider_revision_adds_observation_without_replacing_canonical_play(
         ).fetchall()
 
     assert play_count == 1
+    assert segment_count == 1
     assert [row[0] for row in observations] == ["r1", "r2"]
     yards = [
         json.loads(str(row[1]))["result"]["official_yards_gained"]

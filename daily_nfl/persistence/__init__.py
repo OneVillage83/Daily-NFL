@@ -12,6 +12,7 @@ from daily_nfl.persistence.migrations import (
     SchemaVersionError,
     apply_migrations,
     current_schema_version,
+    validate_schema_history,
 )
 
 __all__ = [
@@ -24,4 +25,5 @@ __all__ = [
     "foreign_keys_enabled",
     "integrity_ok",
     "open_database",
+    "validate_schema_history",
 ]

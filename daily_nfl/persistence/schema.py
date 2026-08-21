@@ -1,6 +1,10 @@
-"""SQLite schema for the Daily NFL canonical persistence layer."""
+"""SQLite schema for the Daily NFL canonical persistence layer.
 
-SCHEMA_VERSION = 1
+This module contains migration-1 DDL only. The governing current schema
+version lives in ``daily_nfl.persistence.migrations``.
+"""
+
+INITIAL_SCHEMA_VERSION = 1
 
 INITIAL_SCHEMA_SQL = r"""
 CREATE TABLE schema_migrations (

@@ -23,6 +23,8 @@ from daily_nfl.reconciliation import (
     team_season_id_for,
 )
 
+COMPETITION_ID = "core-competition-nfl"
+
 
 def _fixture_game_id() -> GameId:
     event_id = new_event_id(UUID("33333333-3333-3333-3333-333333333333"))
@@ -53,8 +55,9 @@ def _insert_game(connection: sqlite3.Connection) -> tuple[str, PredictionCutoff]
             ruleset_version,
             home_team_season_id,
             away_team_season_id,
-            scheduled_kickoff
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            scheduled_kickoff,
+            competition_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             str(game_id),
@@ -66,6 +69,7 @@ def _insert_game(connection: sqlite3.Connection) -> tuple[str, PredictionCutoff]
             str(home_team),
             str(away_team),
             kickoff.isoformat(),
+            COMPETITION_ID,
         ),
     )
     cutoff = PredictionCutoff.from_horizon(

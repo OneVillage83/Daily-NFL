@@ -14,10 +14,10 @@ if str(REPOSITORY_ROOT) not in sys.path:
 from daily_nfl.persistence import (  # noqa: E402
     SCHEMA_VERSION,
     apply_migrations,
-    current_schema_version,
     foreign_keys_enabled,
     integrity_ok,
     open_database,
+    validate_schema_history,
 )
 
 
@@ -42,7 +42,7 @@ def main() -> int:
     database: Path = args.database
 
     with open_database(database) as connection:
-        before = current_schema_version(connection)
+        before = validate_schema_history(connection)
         if args.check:
             after = before
         else:

@@ -21,6 +21,8 @@ from daily_nfl.reconciliation import (
     team_season_id_for,
 )
 
+COMPETITION_ID = "core-competition-nfl"
+
 
 @contextmanager
 def _open_identity_database(path: Path) -> Iterator[sqlite3.Connection]:
@@ -60,8 +62,9 @@ def _insert_fixture_game(
             ruleset_version,
             home_team_season_id,
             away_team_season_id,
-            scheduled_kickoff
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            scheduled_kickoff,
+            competition_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             str(game_id),
@@ -73,6 +76,7 @@ def _insert_fixture_game(
             str(home_team),
             str(away_team),
             kickoff.isoformat(),
+            COMPETITION_ID,
         ),
     )
     return str(game_id)

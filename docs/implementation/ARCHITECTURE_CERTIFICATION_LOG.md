@@ -36,8 +36,8 @@ If later evidence reveals a defect in an earlier certified milestone, that miles
 ```text
 M0  Repository Bootstrap / Engineering Constitution    ARCHITECTURE-CERTIFIED
 M1  Canonical Domain Contracts                         ARCHITECTURE-CERTIFIED
-M2  Persistence & Migration Foundation                 PROVISIONAL — AUDIT NEXT
-M3  Raw Evidence & Provider Abstraction                PROVISIONAL
+M2  Persistence & Migration Foundation                 ARCHITECTURE-CERTIFIED
+M3  Raw Evidence & Provider Abstraction                PROVISIONAL — AUDIT NEXT
 M4  Identity & Reconciliation Engine                   PROVISIONAL
 M5  Historical PIT Engine                              PROVISIONAL
 M6  Canonical Play / Drive Normalization               PROVISIONAL
@@ -134,11 +134,73 @@ M1 — ARCHITECTURE-CERTIFIED
 
 ---
 
+## 2026-08-21 — M2 Certified
+
+**Milestone:** Persistence & Migration Foundation  
+**Architecture:** F-2, F-3, F-4, F-5  
+**PR:** #4  
+**Validated code head:** `d6246696f29e263049f3bb07dd5eb5538e589c22`
+
+Material architecture corrections included:
+
+- forward-only schema migration v4 instead of rewriting migration history;
+- contiguous, name-validated, fail-closed migration-ledger verification;
+- append-only migration ledger;
+- canonical `competition_id` persistence for new games;
+- explicit schedule-observation fields for actual kickoff, neutral site, and schedule version;
+- architecture-native possession-segment identity distinct from legacy possession compatibility;
+- required possession-segment links on new drives and plays;
+- first-class canonical play-event, participation, and penalty identity ledgers;
+- participation/penalty observation links to canonical child identity;
+- participation/penalty `effective_at`, `published_at`, and provider revision persistence;
+- canonical game-result `final_at`;
+- additive v1-v3 migration behavior that does not fabricate newly introduced identity;
+- explicit one-time legacy identity-link backfill followed by immutability;
+- provisional normalization persistence compatibility with the strengthened M1/M2 contracts.
+
+Final local quality gate:
+
+```text
+pytest: 124 passed in 2.30s
+Ruff: All checks passed!
+mypy: Success: no issues found in 68 source files
+git status --short: clean
+```
+
+Real SQLite gate:
+
+```text
+fresh DB: schema 0 -> 4
+foreign_keys_enabled: true
+integrity_ok: true
+mode: migrate
+
+check DB: schema 4 -> 4
+foreign_keys_enabled: true
+integrity_ok: true
+mode: check
+```
+
+Certification-time failure-state checks also confirmed that a completed pass with a penalty produces four canonical events (`SNAP`, `THROW`, `CATCH`, `PENALTY`) and that legacy game/drive/play identity links become immutable after their one allowed explicit backfill.
+
+Evidence:
+
+- `docs/implementation/M2_ARCHITECTURE_CONFORMANCE_AUDIT.md`
+- `docs/implementation/M2_LOCAL_VALIDATION_20260821.md`
+
+Final state:
+
+```text
+M2 — ARCHITECTURE-CERTIFIED
+```
+
+---
+
 ## Next Certification Target
 
 ```text
-M2 — Persistence & Migration Foundation
-Architecture dependencies: F-2, F-3, F-4, F-5
+M3 — Raw Evidence & Provider Abstraction
+Architecture dependency: F-2 (with certified M2 persistence/provenance foundations)
 ```
 
-M2 must be evaluated against the certified M1 ontology. Existing persistence tables and migrations are evidence to audit, not assumptions that redefine the architecture.
+M3 must consume the certified M0-M2 contracts. Existing provider/acquisition code is evidence to audit, not authority to redefine the architecture.

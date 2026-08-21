@@ -12,6 +12,8 @@ from daily_nfl.persistence import (
     open_database,
 )
 
+COMPETITION_ID = "core-competition-nfl"
+
 
 def test_clean_database_initializes_to_current_schema(tmp_path: Path) -> None:
     database = tmp_path / "daily-nfl.db"
@@ -40,8 +42,12 @@ def test_clean_database_initializes_to_current_schema(tmp_path: Path) -> None:
             "games",
             "schedule_observations",
             "possessions",
+            "possession_segments",
             "drives",
             "plays",
+            "play_events",
+            "participations",
+            "penalties",
             "play_observations",
             "participation_observations",
             "penalty_observations",
@@ -167,8 +173,9 @@ def test_game_results_preserve_observations_canonical_revisions_and_sources(
                 ruleset_version,
                 home_team_season_id,
                 away_team_season_id,
-                scheduled_kickoff
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                scheduled_kickoff,
+                competition_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 "game-1",
@@ -180,12 +187,14 @@ def test_game_results_preserve_observations_canonical_revisions_and_sources(
                 "home-2026",
                 "away-2026",
                 "2026-09-10T17:20:00Z",
+                COMPETITION_ID,
             ),
         )
 
         for revision, home_points in ((1, 27), (2, 28)):
             observation_id = f"provider-result-{revision}"
             result_id = f"canonical-result-{revision}"
+            final_at = f"2026-09-11T0{revision}:00:00Z"
             connection.execute(
                 """
                 INSERT INTO game_result_observations(
@@ -225,8 +234,9 @@ def test_game_results_preserve_observations_canonical_revisions_and_sources(
                     reconciliation_method,
                     reconciliation_confidence,
                     derived_at,
-                    available_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    available_at,
+                    final_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     result_id,
@@ -238,6 +248,7 @@ def test_game_results_preserve_observations_canonical_revisions_and_sources(
                     1.0,
                     "2026-09-11T00:00:00Z",
                     "2026-09-11T00:00:00Z",
+                    final_at,
                 ),
             )
             connection.execute(
@@ -246,22 +257,34 @@ def test_game_results_preserve_observations_canonical_revisions_and_sources(
             )
 
         canonical_rows = connection.execute(
-            "SELECT revision, home_points_final FROM game_results ORDER BY revision"
+            "SELECT revision, home_points_final, final_at FROM game_results ORDER BY revision"
         ).fetchall()
         observation_count = connection.execute(
             "SELECT COUNT(*) FROM game_result_observations"
         ).fetchone()
         source_count = connection.execute("SELECT COUNT(*) FROM game_result_sources").fetchone()
         current = connection.execute(
-            "SELECT revision, home_points_final FROM current_game_results WHERE game_id = ?",
+            """
+            SELECT revision, home_points_final, final_at
+            FROM current_game_results
+            WHERE game_id = ?
+            """,
             ("game-1",),
         ).fetchone()
 
         assert [(row[0], row[1]) for row in canonical_rows] == [(1, 27), (2, 28)]
+        assert [row[2] for row in canonical_rows] == [
+            "2026-09-11T01:00:00Z",
+            "2026-09-11T02:00:00Z",
+        ]
         assert observation_count is not None and observation_count[0] == 2
         assert source_count is not None and source_count[0] == 2
         assert current is not None
-        assert (current[0], current[1]) == (2, 28)
+        assert (current[0], current[1], current[2]) == (
+            2,
+            28,
+            "2026-09-11T02:00:00Z",
+        )
 
         with pytest.raises(sqlite3.IntegrityError, match="append-only"):
             connection.execute(
