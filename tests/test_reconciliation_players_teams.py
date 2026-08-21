@@ -8,11 +8,11 @@ from daily_nfl.domain import PersonId
 from daily_nfl.persistence import apply_migrations, open_database
 from daily_nfl.providers import NFLVERSE_DESCRIPTOR, record_provider
 from daily_nfl.reconciliation import (
-    CanonicalEntityType,
-    ExternalIdentity,
     FRANCHISE_ENTITY_TYPE,
     GSIS_AUTHORITY_DESCRIPTOR,
     GSIS_AUTHORITY_PROVIDER_ID,
+    CanonicalEntityType,
+    ExternalIdentity,
     IdentityReconciler,
     IdentityRepository,
     MatchMethod,

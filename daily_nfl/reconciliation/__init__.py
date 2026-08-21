@@ -14,20 +14,20 @@ from daily_nfl.reconciliation.canonical import (
     team_season_id_for,
 )
 from daily_nfl.reconciliation.contracts import (
-    CanonicalEntityType,
-    CrosswalkBinding,
-    ExternalIdentity,
     FRANCHISE_ENTITY_TYPE,
     GAME_ENTITY_TYPE,
     GSIS_PLAYER_ENTITY_TYPE,
+    PLAYER_ENTITY_TYPE,
+    TEAM_SEASON_ENTITY_TYPE,
+    CanonicalEntityType,
+    CrosswalkBinding,
+    ExternalIdentity,
     GameIdentityHint,
     IdentityCandidate,
     MatchMethod,
-    PLAYER_ENTITY_TYPE,
     ReconciliationDecision,
     ReconciliationReason,
     ReconciliationStatus,
-    TEAM_SEASON_ENTITY_TYPE,
 )
 from daily_nfl.reconciliation.reconciler import IdentityReconciler
 from daily_nfl.reconciliation.repository import (

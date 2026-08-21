@@ -10,10 +10,10 @@ import pytest
 from daily_nfl.persistence import apply_migrations, open_database
 from daily_nfl.providers import NFLVERSE_DESCRIPTOR, record_provider
 from daily_nfl.reconciliation import (
+    FRANCHISE_ENTITY_TYPE,
     CanonicalEntityType,
     CrosswalkConflictError,
     ExternalIdentity,
-    FRANCHISE_ENTITY_TYPE,
     IdentityCandidate,
     IdentityReconciler,
     IdentityRepository,

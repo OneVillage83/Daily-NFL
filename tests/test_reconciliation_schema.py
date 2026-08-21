@@ -13,9 +13,9 @@ from daily_nfl.persistence import (
 from daily_nfl.persistence.schema import INITIAL_SCHEMA_SQL
 from daily_nfl.providers import NFLVERSE_DESCRIPTOR, record_provider
 from daily_nfl.reconciliation import (
+    FRANCHISE_ENTITY_TYPE,
     CanonicalEntityType,
     ExternalIdentity,
-    FRANCHISE_ENTITY_TYPE,
     IdentityReconciler,
     IdentityRepository,
     new_franchise_id,
