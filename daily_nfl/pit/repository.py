@@ -13,7 +13,13 @@ from daily_nfl.domain import (
     AvailabilityMethod,
     GameId,
 )
-from daily_nfl.pit.contracts import PITInputKind, PITInputRef, PITPolicy, PredictionCutoff
+from daily_nfl.pit.contracts import (
+    DEFAULT_PIT_POLICY,
+    PITInputKind,
+    PITInputRef,
+    PITPolicy,
+    PredictionCutoff,
+)
 from daily_nfl.pit.selector import PITObservation, select_latest_as_of
 
 
@@ -63,7 +69,7 @@ def schedule_state_as_of(
     *,
     game_id: GameId,
     cutoff: PredictionCutoff,
-    policy: PITPolicy = PITPolicy(),
+    policy: PITPolicy = DEFAULT_PIT_POLICY,
 ) -> ScheduleStateAsOf | None:
     """Return the latest defensible schedule revision known by the cutoff."""
 
