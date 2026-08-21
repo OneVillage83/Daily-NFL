@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -313,7 +314,7 @@ class IdentityReconciler:
         self,
         hint: GameIdentityHint,
         kickoff_delta: timedelta,
-    ) -> tuple[object, ...]:
+    ) -> tuple[sqlite3.Row, ...]:
         rows = self.repository.game_candidates(
             season=hint.season,
             season_phase=hint.season_phase,
