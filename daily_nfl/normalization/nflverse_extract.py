@@ -105,13 +105,20 @@ def _score_pair(
     raise NflverseRowExtractionError("possession teams do not match home/away teams")
 
 
+def _canonical_timeout(value: int | None) -> int | None:
+    """Treat provider sentinel values outside NFL timeout state as unknown."""
+    if value is None or value < 0:
+        return None
+    return value
+
+
 def _timeouts(row: Mapping[str, object]) -> tuple[int | None, int | None]:
     home = _text(row, "home_team")
     away = _text(row, "away_team")
     offense = _text(row, "posteam")
     defense = _text(row, "defteam")
-    offense_timeouts = _integer(row, "posteam_timeouts_remaining")
-    defense_timeouts = _integer(row, "defteam_timeouts_remaining")
+    offense_timeouts = _canonical_timeout(_integer(row, "posteam_timeouts_remaining"))
+    defense_timeouts = _canonical_timeout(_integer(row, "defteam_timeouts_remaining"))
     if home is None or away is None or offense is None or defense is None:
         return None, None
     if offense == home and defense == away:
