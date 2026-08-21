@@ -17,6 +17,7 @@ from daily_nfl.reconciliation.canonical import (
     play_id_for,
     player_id_for_person,
     possession_id_for,
+    possession_segment_id_for,
     team_season_id_for,
 )
 from daily_nfl.reconciliation.contracts import (
@@ -75,5 +76,6 @@ __all__ = [
     "play_id_for",
     "player_id_for_person",
     "possession_id_for",
+    "possession_segment_id_for",
     "team_season_id_for",
 ]
