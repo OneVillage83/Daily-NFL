@@ -4,9 +4,9 @@ import pytest
 
 from daily_nfl.domain import AvailabilityConfidence, AvailabilityMethod
 from daily_nfl.providers import (
+    NFLVERSE_DESCRIPTOR,
     AcquisitionRequest,
     DatasetKind,
-    NFLVERSE_DESCRIPTOR,
     NflverseAdapter,
     NormalizedAcquisition,
     PointInTimeFidelity,
