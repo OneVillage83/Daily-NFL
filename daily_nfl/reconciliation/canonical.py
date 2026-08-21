@@ -9,6 +9,8 @@ from daily_nfl.domain import (
     EventId,
     FranchiseId,
     GameId,
+    ParticipationId,
+    PenaltyId,
     PersonId,
     PlayerId,
     PlayEventId,
@@ -62,9 +64,7 @@ def game_id_for_event(event_id: EventId) -> GameId:
 
 def possession_id_for(game_id: GameId, canonical_sequence: int) -> PossessionId:
     _positive_sequence(canonical_sequence, "possession sequence")
-    return PossessionId(
-        _derived_id("pos", f"nfl-possession:{game_id}:{canonical_sequence}")
-    )
+    return PossessionId(_derived_id("pos", f"nfl-possession:{game_id}:{canonical_sequence}"))
 
 
 def drive_id_for(game_id: GameId, canonical_sequence: int) -> DriveId:
@@ -80,6 +80,18 @@ def play_id_for(game_id: GameId, canonical_sequence: int) -> PlayId:
 def play_event_id_for(play_id: PlayId, sequence: int) -> PlayEventId:
     _positive_sequence(sequence, "play-event sequence")
     return PlayEventId(_derived_id("pev", f"nfl-play-event:{play_id}:{sequence}"))
+
+
+def participation_id_for(play_id: PlayId, sequence: int) -> ParticipationId:
+    _positive_sequence(sequence, "participation sequence")
+    return ParticipationId(
+        _derived_id("par", f"nfl-participation:{play_id}:{sequence}")
+    )
+
+
+def penalty_id_for(play_id: PlayId, sequence: int) -> PenaltyId:
+    _positive_sequence(sequence, "penalty sequence")
+    return PenaltyId(_derived_id("pnl", f"nfl-penalty:{play_id}:{sequence}"))
 
 
 def new_reconciliation_decision_id(value: UUID | None = None) -> str:
