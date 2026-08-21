@@ -86,20 +86,28 @@ def _binding_from_row(row: sqlite3.Row) -> CrosswalkBinding:
 class IdentityRepository:
     connection: sqlite3.Connection
 
-    def active_crosswalks(self, external: ExternalIdentity) -> tuple[CrosswalkBinding, ...]:
+    def active_crosswalks(
+        self,
+        external: ExternalIdentity,
+    ) -> tuple[CrosswalkBinding, ...]:
         params: list[object] = [
             external.provider_id,
             external.provider_entity_type,
             external.external_id,
         ]
         temporal_sql = ""
+        successor_temporal_sql = ""
         if external.valid_at is not None:
             valid_at = _iso(external.valid_at)
             temporal_sql = (
                 "AND (cw.valid_from IS NULL OR cw.valid_from <= ?) "
                 "AND (cw.valid_to IS NULL OR cw.valid_to >= ?) "
             )
-            params.extend([valid_at, valid_at])
+            successor_temporal_sql = (
+                "AND (successor.valid_from IS NULL OR successor.valid_from <= ?) "
+                "AND (successor.valid_to IS NULL OR successor.valid_to >= ?) "
+            )
+            params.extend([valid_at, valid_at, valid_at, valid_at])
 
         rows = self.connection.execute(
             f"""
@@ -113,6 +121,7 @@ class IdentityRepository:
                   SELECT 1
                   FROM entity_crosswalk successor
                   WHERE successor.supersedes_crosswalk_id = cw.crosswalk_id
+                    {successor_temporal_sql}
               )
             ORDER BY cw.crosswalk_id
             """,
@@ -197,7 +206,6 @@ class IdentityRepository:
             raise ValueError("valid_to cannot precede valid_from")
         self._require_canonical_identity(canonical_entity_type, canonical_entity_id)
 
-        superseded: CrosswalkBinding | None = None
         if supersedes_crosswalk_id is not None:
             superseded = self.crosswalk_by_id(supersedes_crosswalk_id)
             if superseded is None:
@@ -276,7 +284,11 @@ class IdentityRepository:
             raise RuntimeError("inserted crosswalk could not be reloaded")
         return binding
 
-    def ensure_franchise(self, franchise_id: FranchiseId, canonical_name: str | None = None) -> None:
+    def ensure_franchise(
+        self,
+        franchise_id: FranchiseId,
+        canonical_name: str | None = None,
+    ) -> None:
         self.connection.execute(
             """
             INSERT INTO franchises(franchise_id, canonical_name)
@@ -306,7 +318,9 @@ class IdentityRepository:
             (str(team_season_id),),
         ).fetchone()
         if row is None or str(row[0]) != str(franchise_id) or int(row[1]) != season:
-            raise CrosswalkConflictError("team-season canonical identity conflicts with stored facts")
+            raise CrosswalkConflictError(
+                "team-season canonical identity conflicts with stored facts"
+            )
 
     def ensure_person_player(
         self,
@@ -335,7 +349,9 @@ class IdentityRepository:
             (str(player_id),),
         ).fetchone()
         if row is None or str(row[0]) != str(person_id):
-            raise CrosswalkConflictError("player canonical identity conflicts with stored person")
+            raise CrosswalkConflictError(
+                "player canonical identity conflicts with stored person"
+            )
 
     def game_candidates(
         self,
