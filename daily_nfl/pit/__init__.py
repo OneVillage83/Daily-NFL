@@ -6,6 +6,7 @@ from daily_nfl.pit.availability import (
     derive_knowledge_timestamp,
 )
 from daily_nfl.pit.contracts import (
+    DEFAULT_PIT_POLICY,
     PITHorizon,
     PITInputKind,
     PITInputRef,
@@ -31,6 +32,7 @@ from daily_nfl.pit.snapshot import (
 
 __all__ = [
     "AvailabilityEvidence",
+    "DEFAULT_PIT_POLICY",
     "IndefensibleAvailabilityError",
     "PITHorizon",
     "PITInputKind",
