@@ -7,7 +7,7 @@ Daily NFL is the NFL modeling engine for **The Daily Line**. Its governing archi
 - F-0 through F-24 architecture: complete and versioned
 - M0 repository bootstrap / engineering constitution: architecture-conformance audit in progress
 - M1 through M6: provisionally implemented; each milestone must be architecture-certified in order before later work is treated as closed
-- Current M0 certification blocker: regenerate `requirements-dev.txt` from the current Python 3.12 dependency inputs, then run the clean quality gate
+- Current M0 certification blocker: regenerate `requirements-dev.txt` from the current Python 3.12 dependency inputs with the pinned compiler toolchain, then run the clean quality gate
 
 The durable project resume point is `docs/implementation/PROJECT_CHECKPOINT_LOG.md`. Milestone-specific conformance evidence belongs in `docs/implementation/`.
 
@@ -56,12 +56,13 @@ From PowerShell on Windows:
 ```powershell
 py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install pip-tools==7.6.0
+python -m pip install "pip==26.1.2" "pip-tools==7.6.0"
 python -m piptools compile --resolver=backtracking --generate-hashes --strip-extras --allow-unsafe --output-file=requirements.txt requirements.in
 python -m piptools compile --resolver=backtracking --generate-hashes --strip-extras --allow-unsafe --output-file=requirements-dev.txt requirements-dev.in
 python -m pip install --require-hashes -r requirements-dev.txt
 ```
+
+Do not run an unpinned `python -m pip install --upgrade pip` before compiling the locks. `pip-tools` depends on pip internals; the compiler toolchain is intentionally pinned for reproducible lock generation.
 
 Then run:
 
@@ -71,7 +72,7 @@ python -m ruff check .
 python -m mypy .
 ```
 
-Whenever `requirements.in` or `requirements-dev.in` changes, regenerate the corresponding compiled lock under Python 3.12. Do not hand-edit compiled hash locks.
+Whenever `requirements.in` or `requirements-dev.in` changes, regenerate the corresponding compiled lock under Python 3.12 with the pinned compiler toolchain. Do not hand-edit compiled hash locks.
 
 Do not commit `.env`, local databases, generated model artifacts, or local raw datasets.
 
