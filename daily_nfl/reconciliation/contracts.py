@@ -151,7 +151,11 @@ class CrosswalkBinding:
             raise ValueError("match_confidence must be between 0 and 1")
         _require_aware(self.valid_from, "valid_from")
         _require_aware(self.valid_to, "valid_to")
-        if self.valid_from is not None and self.valid_to is not None and self.valid_to < self.valid_from:
+        if (
+            self.valid_from is not None
+            and self.valid_to is not None
+            and self.valid_to < self.valid_from
+        ):
             raise ValueError("valid_to cannot precede valid_from")
 
 
