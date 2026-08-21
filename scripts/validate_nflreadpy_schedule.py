@@ -43,7 +43,7 @@ def main() -> int:
             f"nflreadpy schedule season filter mismatch: expected {[season]}, found {seasons}"
         )
 
-    first = frame.select(REQUIRED_COLUMNS).head(1).to_dicts()[0]
+    first = frame.select(list(REQUIRED_COLUMNS)).head(1).to_dicts()[0]
     result = {
         "nflreadpy_version": version("nflreadpy"),
         "season": season,
@@ -51,8 +51,7 @@ def main() -> int:
         "column_count": frame.width,
         "required_columns": list(REQUIRED_COLUMNS),
         "required_schema": {
-            column: str(frame.schema[column])
-            for column in REQUIRED_COLUMNS
+            column: str(frame.schema[column]) for column in REQUIRED_COLUMNS
         },
         "first_row": first,
     }
