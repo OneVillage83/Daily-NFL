@@ -5,7 +5,7 @@ from uuid import UUID
 
 import pytest
 
-from daily_nfl.domain import AvailabilityConfidence, AvailabilityMethod
+from daily_nfl.domain import AvailabilityConfidence, AvailabilityMethod, GameId
 from daily_nfl.persistence import apply_migrations, open_database
 from daily_nfl.pit import (
     PITHorizon,
@@ -24,7 +24,7 @@ from daily_nfl.reconciliation import (
 )
 
 
-def _fixture_game_id():
+def _fixture_game_id() -> GameId:
     event_id = new_event_id(UUID("33333333-3333-3333-3333-333333333333"))
     return game_id_for_event(event_id)
 
