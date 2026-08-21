@@ -4,14 +4,19 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 
 import nflreadpy as nfl  # type: ignore[import-untyped]
 
-from daily_nfl.domain import GameId, TeamSeasonId
-from daily_nfl.normalization import (
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+if str(REPOSITORY_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPOSITORY_ROOT))
+
+from daily_nfl.domain import GameId, TeamSeasonId  # noqa: E402
+from daily_nfl.normalization import (  # noqa: E402
     NflverseGameContext,
     NflversePlayRecord,
     extract_nflverse_play_record,
