@@ -100,10 +100,18 @@ def _validate_facts(facts: tuple[tuple[str, str], ...]) -> None:
 
 @dataclass(frozen=True, slots=True)
 class ExternalIdentity:
+    """Provider identity plus optional namespace scope.
+
+    Some provider IDs are globally unique; others, especially drive/play
+    sequence identifiers, are only unique inside a game. ``scope`` keeps the
+    provider's raw ID intact while preventing false cross-game collisions.
+    """
+
     provider_id: str
     provider_entity_type: str
     external_id: str
     valid_at: datetime | None = None
+    scope: str | None = None
 
     def __post_init__(self) -> None:
         for value, label in (
@@ -113,6 +121,8 @@ class ExternalIdentity:
         ):
             if not value.strip():
                 raise ValueError(f"{label} cannot be blank")
+        if self.scope is not None and not self.scope.strip():
+            raise ValueError("scope cannot be blank when present")
         _require_aware(self.valid_at, "valid_at")
 
 
