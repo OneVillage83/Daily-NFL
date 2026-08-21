@@ -29,13 +29,19 @@ def evidence_observation_id_for(
     evidence_id: str,
     source_uri: str | None,
     observed_at: datetime,
+    ingested_at: datetime,
 ) -> str:
-    """Derive identity for one observation of an immutable raw content object."""
+    """Derive identity for one acquisition of an immutable raw content object."""
 
     if not evidence_id.strip():
         raise ValueError("evidence_id cannot be blank")
     payload = "\0".join(
-        (evidence_id, source_uri or "", _utc_timestamp_key(observed_at))
+        (
+            evidence_id,
+            source_uri or "",
+            _utc_timestamp_key(observed_at),
+            _utc_timestamp_key(ingested_at),
+        )
     ).encode()
     return f"reo_{hashlib.sha256(payload).hexdigest()}"
 
@@ -64,6 +70,7 @@ class StoredEvidence:
             self.artifact.evidence_id,
             self.payload.source_uri,
             self.payload.observed_at,
+            self.ingested_at,
         )
 
 
