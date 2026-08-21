@@ -6,7 +6,12 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from daily_nfl.domain import AvailabilityConfidence, AvailabilityMethod
-from daily_nfl.pit.contracts import PITInputRef, PITPolicy, PredictionCutoff
+from daily_nfl.pit.contracts import (
+    DEFAULT_PIT_POLICY,
+    PITInputRef,
+    PITPolicy,
+    PredictionCutoff,
+)
 
 
 class PITSelectionConflictError(RuntimeError):
@@ -66,7 +71,7 @@ def select_latest_as_of[T](
     observations: tuple[PITObservation[T], ...],
     *,
     cutoff: PredictionCutoff,
-    policy: PITPolicy = PITPolicy(),
+    policy: PITPolicy = DEFAULT_PIT_POLICY,
 ) -> tuple[PITObservation[T], ...]:
     """Select the latest eligible revision for each logical observation key."""
 
