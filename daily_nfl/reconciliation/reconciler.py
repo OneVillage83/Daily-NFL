@@ -6,7 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
-from daily_nfl.domain import FranchiseId, PersonId, PlayerId, TeamSeasonId
+from daily_nfl.domain import FranchiseId, PersonId
 from daily_nfl.reconciliation.canonical import (
     new_person_id,
     new_reconciliation_decision_id,
@@ -189,20 +189,20 @@ class IdentityReconciler:
         )
         self.repository.record_decision(franchise)
         if not franchise.resolved or franchise.selected_canonical_entity_id is None:
-            reason = (
-                ReconciliationReason.MULTIPLE_CANONICAL_CANDIDATES
-                if franchise.status is ReconciliationStatus.AMBIGUOUS
-                else ReconciliationReason.NO_CANONICAL_CANDIDATE
-            )
+            if franchise.status is ReconciliationStatus.AMBIGUOUS:
+                status = ReconciliationStatus.AMBIGUOUS
+                reason = ReconciliationReason.MULTIPLE_CANONICAL_CANDIDATES
+            elif franchise.status is ReconciliationStatus.CONFLICT:
+                status = ReconciliationStatus.CONFLICT
+                reason = ReconciliationReason.CROSSWALK_CONFLICT
+            else:
+                status = ReconciliationStatus.UNRESOLVED
+                reason = ReconciliationReason.NO_CANONICAL_CANDIDATE
             decision = ReconciliationDecision(
                 decision_id=self.decision_id_factory(),
                 external_identity=team_external,
                 expected_entity_type=CanonicalEntityType.TEAM_SEASON,
-                status=(
-                    ReconciliationStatus.AMBIGUOUS
-                    if franchise.status is ReconciliationStatus.AMBIGUOUS
-                    else ReconciliationStatus.UNRESOLVED
-                ),
+                status=status,
                 reason=reason,
             )
             self.repository.record_decision(decision)
@@ -276,10 +276,11 @@ class IdentityReconciler:
             week=hint.week,
         )
         if hint.week is None:
+            kickoff = hint.scheduled_kickoff.astimezone(UTC)
             rows = tuple(
                 row
                 for row in rows
-                if abs(_parse_utc(row["scheduled_kickoff"]) - hint.scheduled_kickoff.astimezone(UTC))
+                if abs(_parse_utc(row["scheduled_kickoff"]) - kickoff)
                 <= max_kickoff_delta
             )
 
@@ -350,7 +351,11 @@ class IdentityReconciler:
         expected_entity_type: CanonicalEntityType,
         candidates: tuple[IdentityCandidate, ...],
     ) -> ReconciliationDecision:
-        if any(candidate.match_method is not MatchMethod.FUZZY_CANDIDATE_ONLY for candidate in candidates):
+        invalid = any(
+            candidate.match_method is not MatchMethod.FUZZY_CANDIDATE_ONLY
+            for candidate in candidates
+        )
+        if invalid:
             raise ValueError("review-only fuzzy candidates must use FUZZY_CANDIDATE_ONLY")
         decision = ReconciliationDecision(
             decision_id=self.decision_id_factory(),
