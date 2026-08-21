@@ -61,12 +61,33 @@ def _record_context(row: dict[str, object], record: NflversePlayRecord) -> Nflve
     return _context(record.provider_game_id, home, away)
 
 
+def _reject_sample(row: dict[str, object]) -> dict[str, object]:
+    keys = (
+        "game_id",
+        "play_id",
+        "play_type",
+        "desc",
+        "qtr",
+        "quarter_seconds_remaining",
+        "yardline_100",
+        "posteam",
+        "defteam",
+        "posteam_score",
+        "defteam_score",
+        "timeout",
+        "quarter_end",
+    )
+    return {key: row.get(key) for key in keys}
+
+
 def main() -> int:
     args = parse_args()
     season = int(args.season)
     frame = nfl.load_pbp([season])
 
     extraction_errors: Counter[str] = Counter()
+    extraction_error_play_types: dict[str, Counter[str]] = defaultdict(Counter)
+    extraction_error_samples: dict[str, list[dict[str, object]]] = defaultdict(list)
     normalization_errors: Counter[str] = Counter()
     taxonomy: Counter[str] = Counter()
     extracted_by_game: dict[str, list[ExtractedRow]] = defaultdict(list)
@@ -83,7 +104,12 @@ def main() -> int:
             record = extract_nflverse_play_record(row)
             context = _record_context(row, record)
         except (TypeError, ValueError) as exc:
-            extraction_errors[str(exc)] += 1
+            reason = str(exc)
+            extraction_errors[reason] += 1
+            play_type = str(row.get("play_type") or "<NULL>")
+            extraction_error_play_types[reason][play_type] += 1
+            if len(extraction_error_samples[reason]) < 5:
+                extraction_error_samples[reason].append(_reject_sample(row))
             continue
 
         game_id = record.provider_game_id
@@ -170,6 +196,11 @@ def main() -> int:
         "extraction_error_count": sum(extraction_errors.values()),
         "normalization_error_count": sum(normalization_errors.values()),
         "extraction_errors": dict(extraction_errors.most_common()),
+        "extraction_error_play_types": {
+            reason: dict(counts.most_common())
+            for reason, counts in extraction_error_play_types.items()
+        },
+        "extraction_error_samples": dict(extraction_error_samples),
         "normalization_errors": dict(normalization_errors.most_common()),
         "canonical_play_type_counts": dict(sorted(taxonomy.items())),
         "representative_normalized_rows": representative,
@@ -190,6 +221,7 @@ def main() -> int:
         "extraction_error_count": result["extraction_error_count"],
         "normalization_error_count": result["normalization_error_count"],
         "canonical_play_type_counts": result["canonical_play_type_counts"],
+        "extraction_error_play_types": result["extraction_error_play_types"],
         "sample_game_id": sample_game_id,
         "next_state_validated": next_state_validated,
         "next_state_error_count": result["next_state_error_count"],
