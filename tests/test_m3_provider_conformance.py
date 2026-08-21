@@ -67,7 +67,7 @@ def test_v5_migration_preserves_certified_m2_raw_evidence(tmp_path: Path) -> Non
         )
         connection.commit()
 
-        assert apply_migrations(connection) == SCHEMA_VERSION == 5
+        assert apply_migrations(connection) == SCHEMA_VERSION == 6
         raw = connection.execute(
             "SELECT provider_id, sha256, object_path FROM raw_evidence WHERE evidence_id = ?",
             ("legacy-evidence",),
