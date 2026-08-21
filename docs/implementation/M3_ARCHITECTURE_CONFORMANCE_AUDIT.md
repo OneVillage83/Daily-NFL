@@ -5,8 +5,9 @@
 **Audit date:** 2026-08-21  
 **Audit branch:** `audit/m3-architecture-conformance`  
 **Certified base:** M2 merge `a0e20f89951946f53b51db94a428669022294bd2`  
+**Validated executable code head:** `3276d5f77027bf2894294a1d66c99c0958ca3286`  
 **Architecture dependency:** F-2 — Data Source & Acquisition Architecture  
-**Certification status:** **NOT YET CERTIFIED — STATIC AUDIT / REMEDIATION IMPLEMENTED; LOCAL AND REAL-PROVIDER GATES PENDING**
+**Certification status:** **M3 — ARCHITECTURE-CERTIFIED**
 
 ---
 
@@ -14,7 +15,7 @@
 
 M3 certifies the boundary between external NFL data and the rest of Daily NFL. F-2 requires provider substitution, raw-first evidence retention, machine-readable capability and licensing metadata, defensible observation clocks, immutable history, and normalized-record lineage that can answer where a value came from and which exact observed bytes supported it.
 
-The existing provider package was treated as provisional evidence. F-2 is authoritative.
+The existing provider package was treated as provisional evidence. F-2 remained authoritative throughout certification.
 
 ---
 
@@ -62,26 +63,26 @@ Exit conditions are one tiny dataset acquired through the abstraction, immutable
 | M3-09 | Cost class represented | `SATISFIED` | Existing `CostClass` retained. |
 | M3-10 | Capability declaration matches implemented exact-raw adapter | `SATISFIED AFTER REMEDIATION` | Certified nflverse descriptor now declares only schedule + PBP mappings currently implemented. |
 | M3-11 | Raw response is retained before parsing | `SATISFIED` | HTTP loader returns exact bytes; acquisition service stores them before downstream parsing. |
-| M3-12 | SHA-256/content-addressed evidence identity | `SATISFIED` | Existing raw store contract retained. |
+| M3-12 | SHA-256/content-addressed evidence identity | `SATISFIED` | Raw store contract plus live checksum parity gate. |
 | M3-13 | Raw store is immutable and tamper-fail-closed | `SATISFIED` | Exclusive-create storage refuses overwrite when stored bytes disagree. |
 | M3-14 | Raw content and acquisition observation are distinct | `SATISFIED AFTER REMEDIATION` | Migration v5 adds `raw_evidence_observations` while preserving M2 content ledger. |
 | M3-15 | Re-observing unchanged bytes preserves history | `SATISFIED AFTER REMEDIATION` | Same content artifact can have multiple immutable acquisition observations. |
 | M3-16 | Independent ingestion events get distinct observation identity | `SATISFIED AFTER REMEDIATION` | Identity includes evidence, source URI, observed time, and ingested time. |
 | M3-17 | Full provenance clocks are retainable | `SATISFIED` | Effective/published/observed/ingested/available clocks retained where available. |
-| M3-18 | Upstream publication timestamp captured when exposed | `SATISFIED AFTER REMEDIATION` | HTTP `Last-Modified` is parsed best-effort; absence remains unknown. |
+| M3-18 | Upstream publication timestamp captured when exposed | `SATISFIED AFTER REMEDIATION` | HTTP `Last-Modified` is parsed best-effort; live gate retained `2026-08-21T19:16:24+00:00`. |
 | M3-19 | Capability/licensing metadata is historically snapshotable | `SATISFIED AFTER REMEDIATION` | Migration v5 adds append-only `provider_capability_snapshots`. |
-| M3-20 | Raw observation snapshots license/attribution context | `SATISFIED AFTER REMEDIATION` | Observation ledger links capability snapshot and retains license/attribution. |
+| M3-20 | Raw observation snapshots license/attribution context | `SATISFIED AFTER REMEDIATION` | Live gate persisted CC-BY-4.0 + required nflverse attribution. |
 | M3-21 | Generic acquisition service enforces capability | `SATISFIED AFTER REMEDIATION` | Undeclared datasets fail before provider loader invocation. |
 | M3-22 | Stored artifact/request/provider invariants checked | `SATISFIED AFTER REMEDIATION` | Provider, dataset, checksum, size, type, and temporal ordering are validated. |
 | M3-23 | Normalized acquisition has record-level raw lineage | `SATISFIED AFTER REMEDIATION` | `NormalizedRecordProvenance` adds source record, evidence, and evidence-observation identity. |
 | M3-24 | Every normalized record requires lineage | `SATISFIED AFTER REMEDIATION` | Envelope rejects cardinality mismatch and unrelated evidence IDs. |
 | M3-25 | Provider disagreements can survive acquisition | `SATISFIED` | Provider/evidence observations remain independent; canonical reconciliation is deferred. |
 | M3-26 | M2 history remains forward-only | `SATISFIED AFTER REMEDIATION` | New schema is migration 5; migrations 1-4 are unchanged. |
-| M3-27 | v4 raw evidence survives v5 | `STATIC TEST IMPLEMENTED; LOCAL GATE PENDING` | Dedicated migration-conformance test added. |
-| M3-28 | New M3 ledgers are append-only | `STATIC TEST IMPLEMENTED; LOCAL GATE PENDING` | Update/delete rejection triggers are part of migration-safety expectations. |
-| M3-29 | Tiny real dataset acquired through abstraction | `LOCAL REAL-PROVIDER GATE PENDING` | `scripts/validate_nflverse_raw.py`. |
-| M3-30 | nflreadpy schema/small historical validation | `LOCAL REAL-PROVIDER GATE PENDING` | `scripts/validate_nflreadpy_schedule.py`. |
-| M3-31 | Full repository quality gate | `LOCAL VALIDATION PENDING` | pytest / Ruff / strict mypy required. |
+| M3-27 | v4 raw evidence survives v5 | `PASS` | Full local suite passed, including migration-conformance coverage. |
+| M3-28 | New M3 ledgers are append-only | `PASS` | Full local suite passed, including update/delete rejection expectations. |
+| M3-29 | Tiny real dataset acquired through abstraction | `PASS` | Real nflverse schedule acquisition completed under schema v5. |
+| M3-30 | nflreadpy schema/small historical validation | `PASS` | nflreadpy 0.1.5 returned 285 schedule rows for 2025 with required schema. |
+| M3-31 | Full repository quality gate | `PASS` | 130 pytest PASS; Ruff PASS; strict mypy PASS across 71 source files; clean tree. |
 
 ---
 
@@ -133,9 +134,9 @@ The generic acquisition service now fails before calling a provider adapter if t
 
 ## 6. Upstream / licensing boundary
 
-The currently certified exact-raw nflverse capabilities are schedule and play-by-play. The nflverse-data release repository currently identifies its broad release-data license as CC BY 4.0, so those two capability records carry CC-BY-4.0 plus attribution metadata.
+The currently certified exact-raw nflverse capabilities are schedule and play-by-play. The nflverse-data release repository identifies its broad release-data license as CC BY 4.0, so those two capability records carry CC-BY-4.0 plus attribution metadata.
 
-This does not authorize Daily NFL to assign that same metadata to every future nflverse dataset. Current nflreadpy documentation explicitly describes separate terms for some FTN-backed data. Future capabilities are reviewed dataset-by-dataset.
+This does not authorize Daily NFL to assign that same metadata to every future nflverse dataset. Current nflreadpy documentation describes separate terms for some FTN-backed data. Future capabilities are reviewed dataset-by-dataset.
 
 ---
 
@@ -151,38 +152,64 @@ This does not authorize Daily NFL to assign that same metadata to every future n
 
 ---
 
-## 8. Required certification evidence
+## 8. Certification evidence
 
-Before certification, the branch must produce:
+Validated executable code head:
 
 ```text
-full pytest PASS
-Ruff PASS
-strict mypy PASS
-clean working tree
-schema version 5
-real nflverse schedule exact-byte acquisition PASS
-stored SHA-256 equals acquired SHA-256
-one persisted capability/license snapshot
-one persisted raw acquisition observation
-CC-BY-4.0 attribution metadata retained
-nflreadpy schedule historical slice returns rows and required schema
+3276d5f77027bf2894294a1d66c99c0958ca3286
 ```
 
-Operational commands are supplied directly in the certification thread so this audit remains an evidence record rather than a shell-runbook.
+Full repository gate:
+
+```text
+pytest: 130 passed in 2.48s
+Ruff: All checks passed!
+mypy: Success: no issues found in 71 source files
+git status --short: clean
+```
+
+Real nflverse raw gate:
+
+```text
+schema_version: 5
+provider_id: nflverse
+dataset: SCHEDULE
+raw_evidence_count: 1
+raw_observation_count: 1
+capability_snapshot_count: 1
+license_id: CC-BY-4.0
+attribution_required: true
+attribution_text: nflverse
+sha256 == stored_sha256: PASS
+```
+
+nflreadpy Lane-B gate:
+
+```text
+nflreadpy_version: 0.1.5
+season: 2025
+row_count: 285
+column_count: 46
+required columns/schema: PASS
+```
+
+Detailed evidence is preserved in `docs/implementation/M3_LOCAL_VALIDATION_20260821.md`.
 
 ---
 
-## 9. Current decision
+## 9. Final decision
 
 ```text
-M3 F-2 STATIC ARCHITECTURE AUDIT: COMPLETE
-M3 CAPABILITY / LICENSING REMEDIATION: IMPLEMENTED
-M3 RAW OBSERVATION HISTORY REMEDIATION: IMPLEMENTED
-M3 NORMALIZED PROVENANCE CONTRACT: IMPLEMENTED
-M3 MIGRATION v5: IMPLEMENTED
-M3 LOCAL QUALITY GATE: PENDING
-M3 REAL NFLVERSE RAW GATE: PENDING
-M3 NFLREADPY LANE-B GATE: PENDING
-M3 ARCHITECTURE CERTIFICATION: WITHHELD UNTIL ALL LOCAL GATES PASS
+M3 F-2 STATIC ARCHITECTURE AUDIT: PASS
+M3 CAPABILITY / LICENSING REMEDIATION: PASS
+M3 RAW OBSERVATION HISTORY REMEDIATION: PASS
+M3 NORMALIZED PROVENANCE CONTRACT: PASS
+M3 MIGRATION v5: PASS
+M3 LOCAL QUALITY GATE: PASS
+M3 REAL NFLVERSE RAW GATE: PASS
+M3 NFLREADPY LANE-B GATE: PASS
+M3 — ARCHITECTURE-CERTIFIED
 ```
+
+M4 — Identity & Reconciliation Engine is the next architecture-certification target.
