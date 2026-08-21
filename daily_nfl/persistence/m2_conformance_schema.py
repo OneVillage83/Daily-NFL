@@ -118,10 +118,27 @@ BEGIN
     SELECT RAISE(ABORT, 'schema_migrations is append-only');
 END;
 
-CREATE TRIGGER games_no_update
+-- A v1-v3 game may legitimately have no competition_id because that field did
+-- not yet exist. Permit exactly one explicit backfill of that new identity
+-- reference while preventing mutation of all previously persisted game facts.
+CREATE TRIGGER games_protect_canonical_update
 BEFORE UPDATE ON games
+WHEN
+    NEW.game_id IS NOT OLD.game_id
+    OR NEW.event_id IS NOT OLD.event_id
+    OR NEW.season IS NOT OLD.season
+    OR NEW.season_phase IS NOT OLD.season_phase
+    OR NEW.week IS NOT OLD.week
+    OR NEW.ruleset_version IS NOT OLD.ruleset_version
+    OR NEW.home_team_season_id IS NOT OLD.home_team_season_id
+    OR NEW.away_team_season_id IS NOT OLD.away_team_season_id
+    OR NEW.venue_id IS NOT OLD.venue_id
+    OR NEW.scheduled_kickoff IS NOT OLD.scheduled_kickoff
+    OR NEW.neutral_site IS NOT OLD.neutral_site
+    OR (OLD.competition_id IS NOT NULL AND NEW.competition_id IS NOT OLD.competition_id)
+    OR (OLD.competition_id IS NULL AND (NEW.competition_id IS NULL OR trim(NEW.competition_id) = ''))
 BEGIN
-    SELECT RAISE(ABORT, 'games canonical identity is append-only');
+    SELECT RAISE(ABORT, 'games canonical identity is append-only after explicit legacy competition backfill');
 END;
 CREATE TRIGGER games_no_delete
 BEFORE DELETE ON games
@@ -140,10 +157,20 @@ BEGIN
     SELECT RAISE(ABORT, 'possession_segments is append-only');
 END;
 
-CREATE TRIGGER drives_no_update
+-- Legacy drives/plays may lack the newly introduced possession_segment_id.
+-- Permit exactly one non-destructive identity-link backfill and then freeze it.
+CREATE TRIGGER drives_protect_canonical_update
 BEFORE UPDATE ON drives
+WHEN
+    NEW.drive_id IS NOT OLD.drive_id
+    OR NEW.game_id IS NOT OLD.game_id
+    OR NEW.possession_id IS NOT OLD.possession_id
+    OR NEW.canonical_sequence IS NOT OLD.canonical_sequence
+    OR (OLD.possession_segment_id IS NOT NULL
+        AND NEW.possession_segment_id IS NOT OLD.possession_segment_id)
+    OR (OLD.possession_segment_id IS NULL AND NEW.possession_segment_id IS NULL)
 BEGIN
-    SELECT RAISE(ABORT, 'drives canonical identity is append-only');
+    SELECT RAISE(ABORT, 'drives canonical identity is append-only after explicit legacy segment backfill');
 END;
 CREATE TRIGGER drives_no_delete
 BEFORE DELETE ON drives
@@ -151,10 +178,19 @@ BEGIN
     SELECT RAISE(ABORT, 'drives canonical identity is append-only');
 END;
 
-CREATE TRIGGER plays_no_update
+CREATE TRIGGER plays_protect_canonical_update
 BEFORE UPDATE ON plays
+WHEN
+    NEW.play_id IS NOT OLD.play_id
+    OR NEW.game_id IS NOT OLD.game_id
+    OR NEW.drive_id IS NOT OLD.drive_id
+    OR NEW.possession_id IS NOT OLD.possession_id
+    OR NEW.canonical_sequence IS NOT OLD.canonical_sequence
+    OR (OLD.possession_segment_id IS NOT NULL
+        AND NEW.possession_segment_id IS NOT OLD.possession_segment_id)
+    OR (OLD.possession_segment_id IS NULL AND NEW.possession_segment_id IS NULL)
 BEGIN
-    SELECT RAISE(ABORT, 'plays canonical identity is append-only');
+    SELECT RAISE(ABORT, 'plays canonical identity is append-only after explicit legacy segment backfill');
 END;
 CREATE TRIGGER plays_no_delete
 BEFORE DELETE ON plays
