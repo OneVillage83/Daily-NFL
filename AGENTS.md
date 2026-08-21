@@ -35,6 +35,47 @@ Codex must:
 - avoid duplicating sport-agnostic responsibilities that belong in Daily-Data-Core;
 - return a concise summary of files changed, checks run, failures, and any unresolved decisions.
 
+## Non-negotiable architecture invariants
+
+The following rules apply to all implementation work unless a later architecture version explicitly changes them.
+
+### Scientific and prediction discipline
+
+- Daily NFL estimates calibrated probability distributions, not merely winners or picks.
+- Every eligible supported prediction is created before Recommendation Gate filtering.
+- `BET`, `LEAN`, `PASS`, and `AVOID` are recommendation outcomes, not reasons to erase a forecast.
+- Football-only, market-only, market-aware, and ensemble information lineage must remain explicit.
+- Uncertainty, provenance, model/feature versions, code version, and deterministic/random-seed metadata must remain reproducible where applicable.
+
+### Provider and evidence discipline
+
+- Providers populate canonical contracts; providers never define the architecture.
+- Raw provider evidence must be retained before normalization and downstream feature engineering.
+- Raw evidence/checksum history and provider observations must not be silently overwritten where revisions matter.
+- Licensing, attribution, provider schema/version, and source metadata are data/provenance concerns, not optional notes.
+
+### Identity discipline
+
+- External provider IDs are crosswalks into provider-neutral canonical entities.
+- Provider IDs must never become permanent Daily Line canonical identity.
+- Ambiguous identity matching must remain explicitly unresolved; never silently fuzzy-match the closest candidate.
+- Reconciliation method, confidence, provenance, and history must remain auditable.
+
+### Point-in-time discipline
+
+- Pregame eligibility is `available_at <= prediction_time < kickoff`.
+- There is no blanket prohibition on Sunday, game-day, or late pregame data if it was legitimately available by the prediction cutoff.
+- When available, preserve distinct `effective_at`, `published_at`, `observed_at`, and `ingested_at` clocks and derive a defensible `available_at` with method/confidence.
+- Historical truth and historical knowledge state are different concepts.
+- Revisions/corrections must remain traceable rather than being destructively rewritten.
+- PIT leakage validation fails closed.
+
+### Evaluation discipline
+
+- Final model validation is chronological / walk-forward; a random train/test split is never the authoritative final validation path.
+- Proper probabilistic scoring and calibration are primary evidence. W/L record, CLV, EV, and realized ROI are downstream evidence, not substitutes for probability quality.
+- Model promotion must be reproducible and compare against appropriate baselines under the same historical information constraints.
+
 ## Architecture authority
 
 The governing architecture files are:
@@ -61,6 +102,29 @@ Reuse proven Daily-MLB engineering conventions where they are sport-neutral and 
 - fail-closed point-in-time validation
 
 Do not copy MLB-specific domain code into Daily-NFL merely for convenience.
+
+## Dependency-lock discipline
+
+- `requirements.in` and `requirements-dev.in` are the authoritative direct dependency inputs.
+- `requirements.txt` and `requirements-dev.txt` are generated lock artifacts and must not be hand-edited.
+- Regenerate locks under Python 3.12 whenever an input file changes.
+- Use the pinned lock compiler toolchain from the repository dependency inputs. The current M0 compiler pair is `pip==26.1.2` with `pip-tools==7.6.0`.
+- Do not run an unpinned `pip install --upgrade pip` before lock compilation; `pip-tools` depends on pip internal APIs and an unsupported pip upgrade can make the compiler non-reproducible or unusable.
+- Keep generated hashes and transitive dependencies intact.
+- Validate a clean environment with `python -m pip install --require-hashes -r requirements-dev.txt`.
+- A milestone that depends on a changed dependency is not reproducibly closed until its compiled lock is refreshed and the quality gate passes from that lock.
+
+## Quality gate
+
+From an activated Python 3.12 environment with the current dev lock installed:
+
+```powershell
+python -m pytest -q
+python -m ruff check .
+python -m mypy .
+```
+
+Milestone-specific validation commands may add to this gate; they do not replace it.
 
 ## Default decision rule
 
