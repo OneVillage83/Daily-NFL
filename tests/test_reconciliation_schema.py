@@ -94,6 +94,32 @@ def test_database_rejects_fuzzy_crosswalk_insert(tmp_path: Path) -> None:
         apply_migrations(connection)
         record_provider(connection, NFLVERSE_DESCRIPTOR)
         IdentityRepository(connection).ensure_franchise(franchise_id)
+        connection.execute(
+            """
+            INSERT INTO identity_reconciliation_decisions(
+                decision_id,
+                provider_id,
+                provider_entity_type,
+                external_id,
+                expected_canonical_entity_type,
+                status,
+                candidate_count,
+                reason_code,
+                details_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "idr_fuzzy_direct_test",
+                "nflverse",
+                FRANCHISE_ENTITY_TYPE,
+                "FUZZY",
+                "FRANCHISE",
+                "AMBIGUOUS",
+                1,
+                "FUZZY_REQUIRES_REVIEW",
+                '{"candidates":[]}',
+            ),
+        )
 
         with pytest.raises(sqlite3.IntegrityError, match="fuzzy candidates"):
             connection.execute(
@@ -106,8 +132,9 @@ def test_database_rejects_fuzzy_crosswalk_insert(tmp_path: Path) -> None:
                     external_id,
                     match_method,
                     match_confidence,
-                    verified
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    verified,
+                    decision_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     "FRANCHISE",
@@ -118,5 +145,6 @@ def test_database_rejects_fuzzy_crosswalk_insert(tmp_path: Path) -> None:
                     "FUZZY_CANDIDATE_ONLY",
                     0.95,
                     0,
+                    "idr_fuzzy_direct_test",
                 ),
             )
