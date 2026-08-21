@@ -154,7 +154,7 @@ def test_normalized_play_persistence_is_idempotent_and_provider_neutral(tmp_path
         assert connection.execute("SELECT COUNT(*) FROM possession_segments").fetchone()[0] == 1
         assert connection.execute("SELECT COUNT(*) FROM drives").fetchone()[0] == 1
         assert connection.execute("SELECT COUNT(*) FROM plays").fetchone()[0] == 1
-        assert connection.execute("SELECT COUNT(*) FROM play_events").fetchone()[0] == 3
+        assert connection.execute("SELECT COUNT(*) FROM play_events").fetchone()[0] == 4
         assert connection.execute("SELECT COUNT(*) FROM penalties").fetchone()[0] == 1
         assert connection.execute("SELECT COUNT(*) FROM play_observations").fetchone()[0] == 1
         assert connection.execute("SELECT COUNT(*) FROM penalty_observations").fetchone()[0] == 1
