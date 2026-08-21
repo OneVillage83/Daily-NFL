@@ -61,10 +61,15 @@ class PITSnapshotManifest:
     inputs: tuple[PITInputRef, ...]
 
     def __post_init__(self) -> None:
-        if not self.snapshot_id.startswith("pit_"):
-            raise ValueError("snapshot_id must use the pit_ prefix")
         if len(self.manifest_sha256) != 64:
             raise ValueError("manifest_sha256 must be a SHA-256 hex digest")
+        if any(
+            character not in "0123456789abcdefABCDEF"
+            for character in self.manifest_sha256
+        ):
+            raise ValueError("manifest_sha256 must be a SHA-256 hex digest")
+        if self.snapshot_id != f"pit_{self.manifest_sha256}":
+            raise ValueError("snapshot_id must equal pit_ plus manifest_sha256")
         if not self.policy_version.strip():
             raise ValueError("policy_version cannot be blank")
 
@@ -78,6 +83,9 @@ def build_snapshot_manifest(
     """Validate and hash the exact information set available at a prediction cutoff."""
 
     assert_no_leakage(inputs, cutoff=cutoff, policy=policy)
+    identities = [(input_ref.input_kind, input_ref.input_id) for input_ref in inputs]
+    if len(identities) != len(set(identities)):
+        raise ValueError("PIT snapshot inputs cannot contain duplicate identities")
     ordered_inputs = tuple(
         sorted(
             inputs,
