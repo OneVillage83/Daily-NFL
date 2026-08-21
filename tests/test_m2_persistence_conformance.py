@@ -295,21 +295,21 @@ def test_v3_migration_preserves_legacy_rows_without_fabricating_new_identity(
 
         with pytest.raises(
             sqlite3.IntegrityError,
-            match="immutable after legacy backfill",
+            match="games canonical identity is immutable after legacy backfill",
         ):
             connection.execute(
                 "UPDATE games SET competition_id='different' WHERE game_id='game-legacy'"
             )
         with pytest.raises(
             sqlite3.IntegrityError,
-            match="immutable after legacy backfill",
+            match="drive identity is immutable after legacy segment backfill",
         ):
             connection.execute(
                 "UPDATE drives SET possession_segment_id=NULL WHERE drive_id='drive-legacy'"
             )
         with pytest.raises(
             sqlite3.IntegrityError,
-            match="immutable after legacy backfill",
+            match="play identity is immutable after legacy segment backfill",
         ):
             connection.execute(
                 "UPDATE plays SET canonical_sequence=2 WHERE play_id='play-legacy'"
