@@ -37,8 +37,8 @@ If later evidence reveals a defect in an earlier certified milestone, that miles
 M0  Repository Bootstrap / Engineering Constitution    ARCHITECTURE-CERTIFIED
 M1  Canonical Domain Contracts                         ARCHITECTURE-CERTIFIED
 M2  Persistence & Migration Foundation                 ARCHITECTURE-CERTIFIED
-M3  Raw Evidence & Provider Abstraction                AUDIT/REMEDIATION COMPLETE — CERTIFICATION GATES PENDING
-M4  Identity & Reconciliation Engine                   PROVISIONAL
+M3  Raw Evidence & Provider Abstraction                ARCHITECTURE-CERTIFIED
+M4  Identity & Reconciliation Engine                   PROVISIONAL — AUDIT NEXT
 M5  Historical PIT Engine                              PROVISIONAL
 M6  Canonical Play / Drive Normalization               PROVISIONAL
 M6B Real nflverse PBP Validation                       COMPLETED IN SUBSTANCE / NOT A SUBSTITUTE FOR M6 CERTIFICATION
@@ -196,13 +196,14 @@ M2 — ARCHITECTURE-CERTIFIED
 
 ---
 
-## 2026-08-21 — M3 Audit / Remediation Complete
+## 2026-08-21 — M3 Certified
 
 **Milestone:** Raw Evidence & Provider Abstraction  
 **Architecture:** F-2  
-**Certification:** WITHHELD pending executable gates
+**PR:** #5  
+**Validated executable code head:** `3276d5f77027bf2894294a1d66c99c0958ca3286`
 
-Static remediation now includes:
+Material architecture corrections included:
 
 - expanded machine-readable per-dataset capability metadata;
 - truthful nflverse exact-raw capability declarations;
@@ -210,25 +211,64 @@ Static remediation now includes:
 - forward-only migration v5;
 - immutable provider capability snapshots;
 - immutable raw acquisition-observation history distinct from content deduplication;
+- independent observation identity for repeated ingestion events;
 - provider publication timestamp capture when exposed;
 - generic acquisition-layer capability enforcement;
-- record-level normalized provenance contract;
-- dedicated real nflverse raw acquisition validation;
-- dedicated nflreadpy small historical schema validation.
+- stored artifact provider/dataset/checksum/size/content-type validation;
+- mandatory record-level normalized provenance;
+- dedicated real nflverse exact-byte acquisition validation;
+- dedicated nflreadpy small historical Lane-B validation.
+
+Final local quality gate:
+
+```text
+pytest: 130 passed in 2.48s
+Ruff: All checks passed!
+mypy: Success: no issues found in 71 source files
+git status --short: clean
+```
+
+Real nflverse exact-byte gate:
+
+```text
+schema_version: 5
+provider_id: nflverse
+dataset: SCHEDULE
+raw_evidence_count: 1
+raw_observation_count: 1
+capability_snapshot_count: 1
+license_id: CC-BY-4.0
+attribution_required: true
+attribution_text: nflverse
+sha256 == stored_sha256: PASS
+```
+
+The HTTP response exposed and M3 retained:
+
+```text
+published_at: 2026-08-21T19:16:24+00:00
+observed_at: 2026-08-21T19:22:52.857692+00:00
+```
+
+nflreadpy Lane-B gate:
+
+```text
+nflreadpy_version: 0.1.5
+season: 2025
+row_count: 285
+column_count: 46
+required schema: PASS
+```
 
 Evidence:
 
 - `docs/implementation/M3_ARCHITECTURE_CONFORMANCE_AUDIT.md`
+- `docs/implementation/M3_LOCAL_VALIDATION_20260821.md`
 
-Current state:
+Final state:
 
 ```text
-M3 STATIC AUDIT: COMPLETE
-M3 REMEDIATION: IMPLEMENTED
-M3 LOCAL QUALITY GATE: PENDING
-M3 REAL NFLVERSE GATE: PENDING
-M3 NFLREADPY LANE-B GATE: PENDING
-M3 ARCHITECTURE CERTIFICATION: WITHHELD
+M3 — ARCHITECTURE-CERTIFIED
 ```
 
 ---
@@ -236,8 +276,8 @@ M3 ARCHITECTURE CERTIFICATION: WITHHELD
 ## Next Certification Target
 
 ```text
-M3 — Raw Evidence & Provider Abstraction
-Architecture dependency: F-2 (with certified M2 persistence/provenance foundations)
+M4 — Identity & Reconciliation Engine
+Primary architecture dependency: F-3 — Canonical Identity & Reconciliation
 ```
 
-M3 remains the active target until all executable gates pass. M4 does not become the certification target merely because provisional M4 code exists.
+M4 must consume the certified M0-M3 contracts. Existing reconciliation code is provisional evidence to audit, not authority to redefine canonical identity semantics.
