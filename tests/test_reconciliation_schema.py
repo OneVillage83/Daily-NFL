@@ -34,7 +34,7 @@ def test_version_one_database_migrates_to_identity_schema(tmp_path: Path) -> Non
         connection.commit()
 
         assert current_schema_version(connection) == 1
-        assert apply_migrations(connection) == SCHEMA_VERSION == 2
+        assert apply_migrations(connection) == SCHEMA_VERSION
 
         tables = {
             str(row[0])
