@@ -18,7 +18,6 @@ from daily_nfl.normalization import (
 )
 from daily_nfl.reconciliation import play_id_for
 
-
 GAME_ID = GameId("nflg_fixture")
 HOME_ID = TeamSeasonId("tms_home")
 AWAY_ID = TeamSeasonId("tms_away")

@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from daily_nfl.domain import (
-    Period,
     Penalty,
+    Period,
     PlayDesignModifier,
     PlayEvent,
     PlayEventType,
