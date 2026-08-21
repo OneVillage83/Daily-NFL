@@ -84,3 +84,39 @@ def test_crosswalk_and_decision_ledgers_are_append_only(tmp_path: Path) -> None:
                 "DELETE FROM identity_reconciliation_decisions WHERE decision_id = ?",
                 (decision.decision_id,),
             )
+
+
+def test_database_rejects_fuzzy_crosswalk_insert(tmp_path: Path) -> None:
+    database = tmp_path / "identity.db"
+    franchise_id = new_franchise_id(UUID("11111111-1111-1111-1111-111111111111"))
+
+    with open_database(database) as connection:
+        apply_migrations(connection)
+        record_provider(connection, NFLVERSE_DESCRIPTOR)
+        IdentityRepository(connection).ensure_franchise(franchise_id)
+
+        with pytest.raises(sqlite3.IntegrityError, match="fuzzy candidates"):
+            connection.execute(
+                """
+                INSERT INTO entity_crosswalk(
+                    canonical_entity_type,
+                    canonical_entity_id,
+                    provider_id,
+                    provider_entity_type,
+                    external_id,
+                    match_method,
+                    match_confidence,
+                    verified
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    "FRANCHISE",
+                    str(franchise_id),
+                    "nflverse",
+                    FRANCHISE_ENTITY_TYPE,
+                    "FUZZY",
+                    "FUZZY_CANDIDATE_ONLY",
+                    0.95,
+                    0,
+                ),
+            )
