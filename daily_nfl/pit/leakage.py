@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from daily_nfl.domain import AvailabilityMethod
 from daily_nfl.pit.contracts import (
+    DEFAULT_PIT_POLICY,
     PITInputKind,
     PITInputRef,
     PITLeakageCode,
@@ -27,7 +28,7 @@ def find_leakage(
     inputs: tuple[PITInputRef, ...],
     *,
     cutoff: PredictionCutoff,
-    policy: PITPolicy = PITPolicy(),
+    policy: PITPolicy = DEFAULT_PIT_POLICY,
 ) -> tuple[PITLeakageViolation, ...]:
     violations: list[PITLeakageViolation] = []
 
@@ -63,10 +64,7 @@ def find_leakage(
                 )
             )
 
-        if (
-            is_current_game
-            and input_ref.input_kind is PITInputKind.WEATHER_ACTUAL
-        ):
+        if is_current_game and input_ref.input_kind is PITInputKind.WEATHER_ACTUAL:
             violations.append(
                 PITLeakageViolation(
                     code=PITLeakageCode.ACTUAL_WEATHER_FOR_CURRENT_GAME,
@@ -133,7 +131,7 @@ def assert_no_leakage(
     inputs: tuple[PITInputRef, ...],
     *,
     cutoff: PredictionCutoff,
-    policy: PITPolicy = PITPolicy(),
+    policy: PITPolicy = DEFAULT_PIT_POLICY,
 ) -> None:
     violations = find_leakage(inputs, cutoff=cutoff, policy=policy)
     if violations:
