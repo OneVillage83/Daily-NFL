@@ -2,6 +2,7 @@
 -r requirements.in
 
 mypy==2.2.0
+nflreadpy==0.1.5
 pip==26.1.2
 pip-tools==7.6.0
 pytest==9.1.1
