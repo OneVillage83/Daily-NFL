@@ -67,6 +67,9 @@ def schedule_state_as_of(
 ) -> ScheduleStateAsOf | None:
     """Return the latest defensible schedule revision known by the cutoff."""
 
+    if game_id != cutoff.game_id:
+        raise ValueError("schedule query game_id must match the prediction cutoff game_id")
+
     rows = connection.execute(
         """
         SELECT
