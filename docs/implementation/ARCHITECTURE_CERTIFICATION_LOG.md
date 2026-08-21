@@ -37,7 +37,7 @@ If later evidence reveals a defect in an earlier certified milestone, that miles
 M0  Repository Bootstrap / Engineering Constitution    ARCHITECTURE-CERTIFIED
 M1  Canonical Domain Contracts                         ARCHITECTURE-CERTIFIED
 M2  Persistence & Migration Foundation                 ARCHITECTURE-CERTIFIED
-M3  Raw Evidence & Provider Abstraction                PROVISIONAL — AUDIT NEXT
+M3  Raw Evidence & Provider Abstraction                AUDIT/REMEDIATION COMPLETE — CERTIFICATION GATES PENDING
 M4  Identity & Reconciliation Engine                   PROVISIONAL
 M5  Historical PIT Engine                              PROVISIONAL
 M6  Canonical Play / Drive Normalization               PROVISIONAL
@@ -196,6 +196,43 @@ M2 — ARCHITECTURE-CERTIFIED
 
 ---
 
+## 2026-08-21 — M3 Audit / Remediation Complete
+
+**Milestone:** Raw Evidence & Provider Abstraction  
+**Architecture:** F-2  
+**Certification:** WITHHELD pending executable gates
+
+Static remediation now includes:
+
+- expanded machine-readable per-dataset capability metadata;
+- truthful nflverse exact-raw capability declarations;
+- per-dataset license and attribution metadata;
+- forward-only migration v5;
+- immutable provider capability snapshots;
+- immutable raw acquisition-observation history distinct from content deduplication;
+- provider publication timestamp capture when exposed;
+- generic acquisition-layer capability enforcement;
+- record-level normalized provenance contract;
+- dedicated real nflverse raw acquisition validation;
+- dedicated nflreadpy small historical schema validation.
+
+Evidence:
+
+- `docs/implementation/M3_ARCHITECTURE_CONFORMANCE_AUDIT.md`
+
+Current state:
+
+```text
+M3 STATIC AUDIT: COMPLETE
+M3 REMEDIATION: IMPLEMENTED
+M3 LOCAL QUALITY GATE: PENDING
+M3 REAL NFLVERSE GATE: PENDING
+M3 NFLREADPY LANE-B GATE: PENDING
+M3 ARCHITECTURE CERTIFICATION: WITHHELD
+```
+
+---
+
 ## Next Certification Target
 
 ```text
@@ -203,4 +240,4 @@ M3 — Raw Evidence & Provider Abstraction
 Architecture dependency: F-2 (with certified M2 persistence/provenance foundations)
 ```
 
-M3 must consume the certified M0-M2 contracts. Existing provider/acquisition code is evidence to audit, not authority to redefine the architecture.
+M3 remains the active target until all executable gates pass. M4 does not become the certification target merely because provisional M4 code exists.
