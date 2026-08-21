@@ -4,9 +4,10 @@ import sqlite3
 from dataclasses import dataclass
 
 from daily_nfl.persistence.identity_schema import IDENTITY_RECONCILIATION_SCHEMA_SQL
+from daily_nfl.persistence.pit_schema import PIT_SNAPSHOT_SCHEMA_SQL
 from daily_nfl.persistence.schema import INITIAL_SCHEMA_SQL
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,6 +23,11 @@ MIGRATIONS: tuple[Migration, ...] = (
         version=2,
         name="identity_reconciliation_foundation",
         sql=IDENTITY_RECONCILIATION_SCHEMA_SQL,
+    ),
+    Migration(
+        version=3,
+        name="historical_pit_snapshot_foundation",
+        sql=PIT_SNAPSHOT_SCHEMA_SQL,
     ),
 )
 
