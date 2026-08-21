@@ -1,8 +1,27 @@
 """Canonical football identity entities independent of provider IDs."""
 
 from dataclasses import dataclass
+from datetime import datetime
 
-from daily_nfl.domain.ids import FranchiseId, PersonId, PlayerId, TeamSeasonId
+from daily_nfl.domain.ids import (
+    CoachRoleId,
+    FranchiseId,
+    PersonId,
+    PlayerId,
+    RosterStintId,
+    TeamSeasonId,
+)
+
+
+def _validate_optional_interval(
+    started_at: datetime | None,
+    ended_at: datetime | None,
+) -> None:
+    for value in (started_at, ended_at):
+        if value is not None and value.tzinfo is None:
+            raise ValueError("identity interval timestamps must be timezone-aware")
+    if started_at is not None and ended_at is not None and ended_at < started_at:
+        raise ValueError("identity interval cannot end before it starts")
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,7 +46,7 @@ class TeamSeason:
 
 @dataclass(frozen=True, slots=True)
 class Person:
-    """Persistent real-person identity independent of roster/team context."""
+    """Persistent real-person identity independent of football role/context."""
 
     person_id: PersonId
 
@@ -36,8 +55,47 @@ class Person:
 class Player:
     """NFL player identity linked to a persistent person.
 
-    Team membership is deliberately absent; it belongs to roster-stint state.
+    Team membership is deliberately absent; it belongs to RosterStint.
     """
 
     player_id: PlayerId
     person_id: PersonId
+
+
+@dataclass(frozen=True, slots=True)
+class RosterStint:
+    """A player's time-bounded relationship with one team-season.
+
+    This preserves F-1's separation between persistent person/player identity
+    and changing team membership. Unknown interval endpoints remain explicit.
+    """
+
+    roster_stint_id: RosterStintId
+    player_id: PlayerId
+    team_season_id: TeamSeasonId
+    started_at: datetime | None = None
+    ended_at: datetime | None = None
+
+    def __post_init__(self) -> None:
+        _validate_optional_interval(self.started_at, self.ended_at)
+
+
+@dataclass(frozen=True, slots=True)
+class CoachingRole:
+    """Time-bounded staff role without collapsing coaching identity into text.
+
+    Coaches are represented by persistent Person identities. The role assignment
+    changes independently across teams/seasons and over time.
+    """
+
+    coach_role_id: CoachRoleId
+    person_id: PersonId
+    team_season_id: TeamSeasonId
+    role: str
+    started_at: datetime | None = None
+    ended_at: datetime | None = None
+
+    def __post_init__(self) -> None:
+        if not self.role.strip():
+            raise ValueError("coaching role cannot be blank")
+        _validate_optional_interval(self.started_at, self.ended_at)
