@@ -7,7 +7,7 @@ import json
 from importlib.metadata import version
 from pathlib import Path
 
-import nflreadpy as nfl
+import nflreadpy as nfl  # type: ignore[import-untyped]
 import polars as pl
 
 CANDIDATE_COLUMNS = (
