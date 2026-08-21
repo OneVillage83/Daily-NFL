@@ -67,6 +67,7 @@ def _binding_from_row(row: sqlite3.Row) -> CrosswalkBinding:
             provider_id=str(row["provider_id"]),
             provider_entity_type=str(row["provider_entity_type"]),
             external_id=str(row["external_id"]),
+            scope=str(row["identity_scope"]) if row["identity_scope"] is not None else None,
         ),
         valid_from=_parse(row["valid_from"]),
         valid_to=_parse(row["valid_to"]),
@@ -94,6 +95,7 @@ class IdentityRepository:
             external.provider_id,
             external.provider_entity_type,
             external.external_id,
+            external.scope or "",
         ]
         temporal_sql = ""
         successor_temporal_sql = ""
@@ -116,6 +118,7 @@ class IdentityRepository:
             WHERE cw.provider_id = ?
               AND cw.provider_entity_type = ?
               AND cw.external_id = ?
+              AND COALESCE(cw.identity_scope, '') = ?
               {temporal_sql}
               AND NOT EXISTS (
                   SELECT 1
@@ -156,6 +159,7 @@ class IdentityRepository:
                 provider_id,
                 provider_entity_type,
                 external_id,
+                identity_scope,
                 expected_canonical_entity_type,
                 status,
                 selected_canonical_entity_id,
@@ -165,13 +169,14 @@ class IdentityRepository:
                 valid_at,
                 reason_code,
                 details_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 decision.decision_id,
                 decision.external_identity.provider_id,
                 decision.external_identity.provider_entity_type,
                 decision.external_identity.external_id,
+                decision.external_identity.scope,
                 decision.expected_entity_type.value,
                 decision.status.value,
                 decision.selected_canonical_entity_id,
@@ -295,6 +300,7 @@ class IdentityRepository:
                 or superseded.external_identity.provider_entity_type
                 != external.provider_entity_type
                 or superseded.external_identity.external_id != external.external_id
+                or superseded.external_identity.scope != external.scope
             ):
                 raise CrosswalkConflictError(
                     "superseding mapping must refer to the same provider external identity"
@@ -304,6 +310,7 @@ class IdentityRepository:
             provider_id=external.provider_id,
             provider_entity_type=external.provider_entity_type,
             external_id=external.external_id,
+            scope=external.scope,
         )
         for existing in self.active_crosswalks(lookup_external):
             if existing.crosswalk_id == supersedes_crosswalk_id:
@@ -344,6 +351,7 @@ class IdentityRepository:
                 provider_id,
                 provider_entity_type,
                 external_id,
+                identity_scope,
                 valid_from,
                 valid_to,
                 match_method,
@@ -351,7 +359,7 @@ class IdentityRepository:
                 verified,
                 decision_id,
                 supersedes_crosswalk_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 canonical_entity_type.value,
@@ -359,6 +367,7 @@ class IdentityRepository:
                 external.provider_id,
                 external.provider_entity_type,
                 external.external_id,
+                external.scope,
                 _iso(valid_from),
                 _iso(valid_to),
                 match_method.value,
