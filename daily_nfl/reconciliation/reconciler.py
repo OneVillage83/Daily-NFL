@@ -199,14 +199,17 @@ class IdentityReconciler:
     ) -> ReconciliationDecision:
         valid_from, valid_to = _season_identity_window(season)
         lookup_at = valid_at or valid_from
-        if not valid_from <= lookup_at.astimezone(UTC) <= valid_to:
+        if lookup_at.tzinfo is None or lookup_at.utcoffset() is None:
+            raise ValueError("valid_at must be timezone-aware when present")
+        lookup_at_utc = lookup_at.astimezone(UTC)
+        if not valid_from <= lookup_at_utc <= valid_to:
             raise ValueError("valid_at is outside the requested NFL team-season window")
 
         team_external = ExternalIdentity(
             provider_id=provider_id,
             provider_entity_type=TEAM_SEASON_ENTITY_TYPE,
             external_id=external_team_id,
-            valid_at=lookup_at,
+            valid_at=lookup_at_utc,
         )
         existing = self._evaluate_existing_crosswalk(
             team_external,
@@ -240,7 +243,7 @@ class IdentityReconciler:
             provider_id=provider_id,
             provider_entity_type=FRANCHISE_ENTITY_TYPE,
             external_id=external_team_id,
-            valid_at=lookup_at,
+            valid_at=lookup_at_utc,
         )
         franchise = self._evaluate_existing_crosswalk(
             franchise_external,
@@ -446,7 +449,12 @@ class IdentityReconciler:
         hint: DriveIdentityHint,
         evidence: tuple[ReconciliationEvidence, ...] = (),
     ) -> ReconciliationDecision:
-        external = ExternalIdentity(provider_id, DRIVE_ENTITY_TYPE, external_drive_id)
+        external = ExternalIdentity(
+            provider_id=provider_id,
+            provider_entity_type=DRIVE_ENTITY_TYPE,
+            external_id=external_drive_id,
+            scope=str(hint.game_id),
+        )
         existing = self._evaluate_existing_crosswalk(
             external,
             CanonicalEntityType.DRIVE,
@@ -513,7 +521,12 @@ class IdentityReconciler:
         hint: PlayIdentityHint,
         evidence: tuple[ReconciliationEvidence, ...] = (),
     ) -> ReconciliationDecision:
-        external = ExternalIdentity(provider_id, PLAY_ENTITY_TYPE, external_play_id)
+        external = ExternalIdentity(
+            provider_id=provider_id,
+            provider_entity_type=PLAY_ENTITY_TYPE,
+            external_id=external_play_id,
+            scope=str(hint.game_id),
+        )
         existing = self._evaluate_existing_crosswalk(
             external,
             CanonicalEntityType.PLAY,
