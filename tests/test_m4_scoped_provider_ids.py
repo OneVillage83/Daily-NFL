@@ -1,6 +1,7 @@
 from pathlib import Path
 from uuid import UUID
 
+from daily_nfl.domain import GameId, PlayId
 from daily_nfl.persistence import apply_migrations, open_database
 from daily_nfl.providers import NFLVERSE_DESCRIPTOR, record_provider
 from daily_nfl.reconciliation import (
@@ -26,7 +27,7 @@ def _seed_game_with_first_play(
     *,
     event_uuid: UUID,
     week: int,
-) -> tuple[str, str]:
+) -> tuple[GameId, PlayId]:
     connection = repository.connection
     home = new_franchise_id(UUID("11111111-1111-1111-1111-111111111111"))
     away = new_franchise_id(UUID("22222222-2222-2222-2222-222222222222"))
@@ -88,7 +89,7 @@ def _seed_game_with_first_play(
         """,
         (str(play_id), str(game_id), str(possession_id), 1, str(segment_id)),
     )
-    return str(game_id), str(play_id)
+    return game_id, play_id
 
 
 def test_same_provider_play_id_can_exist_in_two_games(tmp_path: Path) -> None:
@@ -121,16 +122,16 @@ def test_same_provider_play_id_can_exist_in_two_games(tmp_path: Path) -> None:
             hint=PlayIdentityHint(game_id=second_game, canonical_sequence=1),
         )
 
-        assert first.selected_canonical_entity_id == first_play
-        assert second.selected_canonical_entity_id == second_play
+        assert first.selected_canonical_entity_id == str(first_play)
+        assert second.selected_canonical_entity_id == str(second_play)
         assert first_play != second_play
 
         first_bindings = repository.active_crosswalks(
-            ExternalIdentity("nflverse", PLAY_ENTITY_TYPE, "1", scope=first_game)
+            ExternalIdentity("nflverse", PLAY_ENTITY_TYPE, "1", scope=str(first_game))
         )
         second_bindings = repository.active_crosswalks(
-            ExternalIdentity("nflverse", PLAY_ENTITY_TYPE, "1", scope=second_game)
+            ExternalIdentity("nflverse", PLAY_ENTITY_TYPE, "1", scope=str(second_game))
         )
         assert len(first_bindings) == len(second_bindings) == 1
-        assert first_bindings[0].canonical_entity_id == first_play
-        assert second_bindings[0].canonical_entity_id == second_play
+        assert first_bindings[0].canonical_entity_id == str(first_play)
+        assert second_bindings[0].canonical_entity_id == str(second_play)
