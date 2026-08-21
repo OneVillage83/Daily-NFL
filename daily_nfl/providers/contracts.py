@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
-from typing import Generic, Protocol, TypeVar, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from daily_nfl.domain import AvailabilityConfidence, AvailabilityMethod
 
@@ -163,11 +163,8 @@ class ProviderAdapter(Protocol):
     def acquire(self, request: AcquisitionRequest) -> tuple[ProviderPayload, ...]: ...
 
 
-NormalizedT = TypeVar("NormalizedT")
-
-
 @dataclass(frozen=True, slots=True)
-class NormalizedAcquisition(Generic[NormalizedT]):
+class NormalizedAcquisition[NormalizedT]:
     """Typed normalized records linked back to every contributing raw asset."""
 
     provider_id: str
