@@ -36,10 +36,25 @@ CREATE TABLE pit_snapshot_inputs (
     PRIMARY KEY(snapshot_id, input_kind, input_id)
 );
 
+CREATE TABLE pit_snapshot_seals (
+    snapshot_id TEXT PRIMARY KEY REFERENCES pit_snapshots(snapshot_id),
+    sealed_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+
 CREATE INDEX idx_pit_snapshot_inputs_available
     ON pit_snapshot_inputs(snapshot_id, available_at);
 CREATE INDEX idx_pit_snapshot_inputs_evidence
     ON pit_snapshot_inputs(evidence_id);
+
+CREATE TRIGGER pit_snapshot_inputs_require_unsealed
+BEFORE INSERT ON pit_snapshot_inputs
+WHEN EXISTS (
+    SELECT 1 FROM pit_snapshot_seals seal
+    WHERE seal.snapshot_id = NEW.snapshot_id
+)
+BEGIN
+    SELECT RAISE(ABORT, 'sealed PIT snapshot membership cannot change');
+END;
 
 CREATE TRIGGER pit_snapshots_no_update
 BEFORE UPDATE ON pit_snapshots
@@ -61,5 +76,16 @@ CREATE TRIGGER pit_snapshot_inputs_no_delete
 BEFORE DELETE ON pit_snapshot_inputs
 BEGIN
     SELECT RAISE(ABORT, 'pit_snapshot_inputs is append-only');
+END;
+
+CREATE TRIGGER pit_snapshot_seals_no_update
+BEFORE UPDATE ON pit_snapshot_seals
+BEGIN
+    SELECT RAISE(ABORT, 'pit_snapshot_seals is append-only');
+END;
+CREATE TRIGGER pit_snapshot_seals_no_delete
+BEFORE DELETE ON pit_snapshot_seals
+BEGIN
+    SELECT RAISE(ABORT, 'pit_snapshot_seals is append-only');
 END;
 """
