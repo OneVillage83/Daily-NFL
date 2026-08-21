@@ -37,10 +37,18 @@ CREATE TABLE identity_reconciliation_decisions (
     details_json TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
     CHECK (
-        (status = 'RESOLVED' AND selected_canonical_entity_id IS NOT NULL)
+        (
+            status = 'RESOLVED'
+            AND selected_canonical_entity_id IS NOT NULL
+            AND match_method IS NOT NULL
+            AND match_confidence IS NOT NULL
+            AND match_method <> 'FUZZY_CANDIDATE_ONLY'
+        )
         OR
-        (status IN ('UNRESOLVED', 'AMBIGUOUS', 'CONFLICT')
-         AND selected_canonical_entity_id IS NULL)
+        (
+            status IN ('UNRESOLVED', 'AMBIGUOUS', 'CONFLICT')
+            AND selected_canonical_entity_id IS NULL
+        )
     )
 );
 
@@ -56,6 +64,13 @@ CREATE INDEX idx_identity_decision_selected
         expected_canonical_entity_type,
         selected_canonical_entity_id
     );
+
+CREATE TRIGGER entity_crosswalk_reject_fuzzy_insert
+BEFORE INSERT ON entity_crosswalk
+WHEN NEW.match_method = 'FUZZY_CANDIDATE_ONLY'
+BEGIN
+    SELECT RAISE(ABORT, 'fuzzy candidates cannot become canonical crosswalks');
+END;
 
 CREATE TRIGGER entity_crosswalk_no_update
 BEFORE UPDATE ON entity_crosswalk
