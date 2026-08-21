@@ -6,6 +6,22 @@ new crosswalk rows to reference an auditable reconciliation decision.
 """
 
 M4_IDENTITY_CONFORMANCE_SCHEMA_SQL = r"""
+DROP INDEX IF EXISTS uq_crosswalk_mapping_version;
+CREATE UNIQUE INDEX uq_crosswalk_mapping_version_v2
+    ON entity_crosswalk(
+        provider_id,
+        provider_entity_type,
+        external_id,
+        COALESCE(valid_from, ''),
+        COALESCE(valid_to, ''),
+        canonical_entity_type,
+        canonical_entity_id,
+        match_method,
+        match_confidence,
+        verified,
+        COALESCE(supersedes_crosswalk_id, 0)
+    );
+
 CREATE TABLE identity_reconciliation_evidence (
     decision_id TEXT NOT NULL
         REFERENCES identity_reconciliation_decisions(decision_id),
@@ -45,7 +61,8 @@ END;
 
 CREATE TRIGGER entity_crosswalk_require_existing_decision
 BEFORE INSERT ON entity_crosswalk
-WHEN NOT EXISTS (
+WHEN NEW.decision_id IS NOT NULL
+ AND NOT EXISTS (
     SELECT 1
     FROM identity_reconciliation_decisions decision
     WHERE decision.decision_id = NEW.decision_id
