@@ -136,7 +136,7 @@ class IdentityRepository:
         ).fetchone()
         return _binding_from_row(row) if row is not None else None
 
-    def record_decision(self, decision: ReconciliationDecision) -> None:
+    def _record_decision_rows(self, decision: ReconciliationDecision) -> None:
         details = {
             "candidates": [
                 {
@@ -183,6 +183,84 @@ class IdentityRepository:
                 json.dumps(details, sort_keys=True, separators=(",", ":")),
             ),
         )
+        for sequence, evidence in enumerate(decision.evidence, start=1):
+            self.connection.execute(
+                """
+                INSERT INTO identity_reconciliation_evidence(
+                    decision_id,
+                    evidence_sequence,
+                    source_record_id,
+                    evidence_id,
+                    evidence_observation_id,
+                    evidence_kind,
+                    facts_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    decision.decision_id,
+                    sequence,
+                    evidence.source_record_id,
+                    evidence.evidence_id,
+                    evidence.evidence_observation_id,
+                    evidence.evidence_kind,
+                    json.dumps(dict(evidence.facts), sort_keys=True, separators=(",", ":")),
+                ),
+            )
+
+    def record_decision(self, decision: ReconciliationDecision) -> None:
+        """Atomically persist one immutable decision and all supporting evidence."""
+
+        self.connection.execute("SAVEPOINT identity_decision_record")
+        try:
+            self._record_decision_rows(decision)
+        except Exception:
+            self.connection.execute("ROLLBACK TO identity_decision_record")
+            self.connection.execute("RELEASE identity_decision_record")
+            raise
+        self.connection.execute("RELEASE identity_decision_record")
+
+    def record_resolution_binding(
+        self,
+        decision: ReconciliationDecision,
+        *,
+        canonical_entity_type: CanonicalEntityType,
+        canonical_entity_id: str,
+        external: ExternalIdentity,
+        match_method: MatchMethod,
+        match_confidence: float,
+        verified: bool,
+        valid_from: datetime | None = None,
+        valid_to: datetime | None = None,
+        supersedes_crosswalk_id: int | None = None,
+    ) -> CrosswalkBinding:
+        """Atomically record a resolved decision and its crosswalk binding."""
+
+        if not decision.resolved:
+            raise ValueError("record_resolution_binding requires a resolved decision")
+        if decision.decision_id.strip() == "":
+            raise ValueError("decision_id cannot be blank")
+
+        self.connection.execute("SAVEPOINT identity_resolution_binding")
+        try:
+            self._record_decision_rows(decision)
+            binding = self.bind(
+                canonical_entity_type=canonical_entity_type,
+                canonical_entity_id=canonical_entity_id,
+                external=external,
+                match_method=match_method,
+                match_confidence=match_confidence,
+                verified=verified,
+                decision_id=decision.decision_id,
+                valid_from=valid_from,
+                valid_to=valid_to,
+                supersedes_crosswalk_id=supersedes_crosswalk_id,
+            )
+        except Exception:
+            self.connection.execute("ROLLBACK TO identity_resolution_binding")
+            self.connection.execute("RELEASE identity_resolution_binding")
+            raise
+        self.connection.execute("RELEASE identity_resolution_binding")
+        return binding
 
     def bind(
         self,
@@ -204,6 +282,8 @@ class IdentityRepository:
             raise ValueError("match_confidence must be between 0 and 1")
         if valid_from is not None and valid_to is not None and valid_to < valid_from:
             raise ValueError("valid_to cannot precede valid_from")
+        if decision_id is None or not decision_id.strip():
+            raise ValueError("certified crosswalk bindings require a reconciliation decision_id")
         self._require_canonical_identity(canonical_entity_type, canonical_entity_id)
 
         if supersedes_crosswalk_id is not None:
@@ -235,13 +315,23 @@ class IdentityRepository:
                 valid_to,
             ):
                 continue
-            if (
+            same_identity_interval = (
                 existing.canonical_entity_type is canonical_entity_type
                 and existing.canonical_entity_id == canonical_entity_id
                 and existing.valid_from == valid_from
                 and existing.valid_to == valid_to
-            ):
-                return existing
+            )
+            if same_identity_interval:
+                same_resolution_metadata = (
+                    existing.match_method is match_method
+                    and existing.match_confidence == match_confidence
+                    and existing.verified is verified
+                )
+                if same_resolution_metadata:
+                    return existing
+                raise CrosswalkConflictError(
+                    "crosswalk resolution metadata changed; explicit supersession is required"
+                )
             raise CrosswalkConflictError(
                 "external identity already has an overlapping active canonical mapping"
             )
@@ -325,6 +415,13 @@ class IdentityRepository:
                 "team-season canonical identity conflicts with stored facts"
             )
 
+    def team_season_matches(self, canonical_entity_id: str, season: int) -> bool:
+        row = self.connection.execute(
+            "SELECT season FROM team_seasons WHERE team_season_id = ?",
+            (canonical_entity_id,),
+        ).fetchone()
+        return row is not None and int(row[0]) == season
+
     def ensure_person_player(
         self,
         person_id: PersonId,
@@ -385,6 +482,74 @@ class IdentityRepository:
         sql += " ORDER BY scheduled_kickoff, game_id"
         return tuple(self.connection.execute(sql, tuple(params)).fetchall())
 
+    def drive_candidates(
+        self,
+        *,
+        game_id: str,
+        canonical_sequence: int,
+        possession_segment_id: str | None,
+    ) -> tuple[sqlite3.Row, ...]:
+        sql = """
+            SELECT drive_id, game_id, canonical_sequence, possession_segment_id
+            FROM drives
+            WHERE game_id = ? AND canonical_sequence = ?
+        """
+        params: list[object] = [game_id, canonical_sequence]
+        if possession_segment_id is not None:
+            sql += " AND possession_segment_id = ?"
+            params.append(possession_segment_id)
+        sql += " ORDER BY drive_id"
+        return tuple(self.connection.execute(sql, tuple(params)).fetchall())
+
+    def play_candidates(
+        self,
+        *,
+        game_id: str,
+        canonical_sequence: int,
+        drive_id: str | None,
+    ) -> tuple[sqlite3.Row, ...]:
+        sql = """
+            SELECT play_id, game_id, drive_id, canonical_sequence
+            FROM plays
+            WHERE game_id = ? AND canonical_sequence = ?
+        """
+        params: list[object] = [game_id, canonical_sequence]
+        if drive_id is not None:
+            sql += " AND drive_id = ?"
+            params.append(drive_id)
+        sql += " ORDER BY play_id"
+        return tuple(self.connection.execute(sql, tuple(params)).fetchall())
+
+    def drive_matches_hint(
+        self,
+        canonical_entity_id: str,
+        *,
+        game_id: str,
+        canonical_sequence: int,
+        possession_segment_id: str | None,
+    ) -> bool:
+        rows = self.drive_candidates(
+            game_id=game_id,
+            canonical_sequence=canonical_sequence,
+            possession_segment_id=possession_segment_id,
+        )
+        return any(str(row["drive_id"]) == canonical_entity_id for row in rows)
+
+    def play_matches_hint(
+        self,
+        canonical_entity_id: str,
+        *,
+        game_id: str,
+        canonical_sequence: int,
+        drive_id: str | None,
+    ) -> bool:
+        rows = self.play_candidates(
+            game_id=game_id,
+            canonical_sequence=canonical_sequence,
+            drive_id=drive_id,
+        )
+        return any(str(row["play_id"]) == canonical_entity_id for row in rows)
+
     def _require_canonical_identity(
         self,
         entity_type: CanonicalEntityType,
@@ -395,9 +560,23 @@ class IdentityRepository:
             CanonicalEntityType.TEAM_SEASON: ("team_seasons", "team_season_id"),
             CanonicalEntityType.PERSON: ("persons", "person_id"),
             CanonicalEntityType.PLAYER: ("players", "player_id"),
-            CanonicalEntityType.GAME: ("games", "game_id"),
             CanonicalEntityType.EVENT: ("games", "event_id"),
-        }[entity_type]
+            CanonicalEntityType.GAME: ("games", "game_id"),
+            CanonicalEntityType.POSSESSION: ("possessions", "possession_id"),
+            CanonicalEntityType.POSSESSION_SEGMENT: (
+                "possession_segments",
+                "possession_segment_id",
+            ),
+            CanonicalEntityType.DRIVE: ("drives", "drive_id"),
+            CanonicalEntityType.PLAY: ("plays", "play_id"),
+            CanonicalEntityType.PLAY_EVENT: ("play_events", "play_event_id"),
+            CanonicalEntityType.PARTICIPATION: ("participations", "participation_id"),
+            CanonicalEntityType.PENALTY: ("penalties", "penalty_id"),
+        }.get(entity_type)
+        if table_and_column is None:
+            raise CanonicalIdentityNotFoundError(
+                f"canonical {entity_type.value} identity ledger is not materialized yet"
+            )
         table, column = table_and_column
         row = self.connection.execute(
             f"SELECT 1 FROM {table} WHERE {column} = ? LIMIT 1",
