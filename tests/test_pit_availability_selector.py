@@ -26,7 +26,7 @@ from daily_nfl.pit import (
 def _cutoff(horizon: PITHorizon = PITHorizon.T_90M) -> PredictionCutoff:
     return PredictionCutoff.from_horizon(
         game_id=GameId("gam_fixture"),
-        kickoff=datetime(2026, 9, 10, 20, 20, tzinfo=UTC),
+        kickoff=datetime(2026, 9, 13, 20, 20, tzinfo=UTC),
         horizon=horizon,
     )
 
@@ -55,7 +55,7 @@ def _input(
 def test_standard_horizon_derives_exact_prediction_cutoff() -> None:
     cutoff = _cutoff(PITHorizon.T_15M)
 
-    assert cutoff.prediction_time == datetime(2026, 9, 10, 20, 5, tzinfo=UTC)
+    assert cutoff.prediction_time == datetime(2026, 9, 13, 20, 5, tzinfo=UTC)
     assert cutoff.prediction_time < cutoff.kickoff
 
 
@@ -111,10 +111,11 @@ def test_strict_policy_rejects_unknown_and_inferred_low_confidence() -> None:
     assert not is_input_eligible(inferred, cutoff, PITPolicy())
 
 
-def test_game_day_information_is_eligible_when_available_before_cutoff() -> None:
+def test_sunday_game_day_information_is_eligible_before_cutoff() -> None:
     cutoff = _cutoff(PITHorizon.T_15M)
     report = _input("late-report", cutoff.prediction_time - timedelta(minutes=2))
 
+    assert cutoff.kickoff.weekday() == 6
     assert is_input_eligible(report, cutoff, PITPolicy())
 
 
