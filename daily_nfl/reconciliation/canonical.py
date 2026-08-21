@@ -5,11 +5,15 @@ from __future__ import annotations
 from uuid import UUID, uuid4, uuid5
 
 from daily_nfl.domain import (
+    DriveId,
     EventId,
     FranchiseId,
     GameId,
     PersonId,
     PlayerId,
+    PlayEventId,
+    PlayId,
+    PossessionId,
     TeamSeasonId,
 )
 
@@ -23,6 +27,11 @@ def _root_id(prefix: str, value: UUID | None = None) -> str:
 
 def _derived_id(prefix: str, identity: str) -> str:
     return f"{prefix}_{uuid5(_DERIVED_NAMESPACE, identity).hex}"
+
+
+def _positive_sequence(sequence: int, label: str) -> None:
+    if sequence < 1:
+        raise ValueError(f"{label} must be positive")
 
 
 def new_franchise_id(value: UUID | None = None) -> FranchiseId:
@@ -49,6 +58,28 @@ def new_event_id(value: UUID | None = None) -> EventId:
 
 def game_id_for_event(event_id: EventId) -> GameId:
     return GameId(_derived_id("nflg", f"nfl-game:{event_id}"))
+
+
+def possession_id_for(game_id: GameId, canonical_sequence: int) -> PossessionId:
+    _positive_sequence(canonical_sequence, "possession sequence")
+    return PossessionId(
+        _derived_id("pos", f"nfl-possession:{game_id}:{canonical_sequence}")
+    )
+
+
+def drive_id_for(game_id: GameId, canonical_sequence: int) -> DriveId:
+    _positive_sequence(canonical_sequence, "drive sequence")
+    return DriveId(_derived_id("drv", f"nfl-drive:{game_id}:{canonical_sequence}"))
+
+
+def play_id_for(game_id: GameId, canonical_sequence: int) -> PlayId:
+    _positive_sequence(canonical_sequence, "play sequence")
+    return PlayId(_derived_id("plx", f"nfl-play:{game_id}:{canonical_sequence}"))
+
+
+def play_event_id_for(play_id: PlayId, sequence: int) -> PlayEventId:
+    _positive_sequence(sequence, "play-event sequence")
+    return PlayEventId(_derived_id("pev", f"nfl-play-event:{play_id}:{sequence}"))
 
 
 def new_reconciliation_decision_id(value: UUID | None = None) -> str:
