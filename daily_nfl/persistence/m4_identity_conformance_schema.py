@@ -1,17 +1,22 @@
 """Forward-only schema additions required by the M4 F-3 identity contract.
 
 Migration 6 leaves the provisional migration-2 identity history intact while
-adding first-class source evidence for reconciliation decisions and requiring
-new crosswalk rows to reference an auditable reconciliation decision.
+adding first-class source evidence for reconciliation decisions, scoped
+provider identities, and a requirement that new crosswalk rows cite an
+auditable reconciliation decision.
 """
 
 M4_IDENTITY_CONFORMANCE_SCHEMA_SQL = r"""
+ALTER TABLE entity_crosswalk ADD COLUMN identity_scope TEXT;
+ALTER TABLE identity_reconciliation_decisions ADD COLUMN identity_scope TEXT;
+
 DROP INDEX IF EXISTS uq_crosswalk_mapping_version;
 CREATE UNIQUE INDEX uq_crosswalk_mapping_version_v2
     ON entity_crosswalk(
         provider_id,
         provider_entity_type,
         external_id,
+        COALESCE(identity_scope, ''),
         COALESCE(valid_from, ''),
         COALESCE(valid_to, ''),
         canonical_entity_type,
@@ -20,6 +25,14 @@ CREATE UNIQUE INDEX uq_crosswalk_mapping_version_v2
         match_confidence,
         verified,
         COALESCE(supersedes_crosswalk_id, 0)
+    );
+
+CREATE INDEX idx_crosswalk_external_scope
+    ON entity_crosswalk(
+        provider_id,
+        provider_entity_type,
+        external_id,
+        identity_scope
     );
 
 CREATE TABLE identity_reconciliation_evidence (
