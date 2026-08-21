@@ -43,4 +43,6 @@ class ProviderRegistry:
         return tuple(sorted(providers, key=lambda descriptor: descriptor.provider_id))
 
     def all(self) -> tuple[ProviderDescriptor, ...]:
-        return tuple(sorted(self._providers.values(), key=lambda descriptor: descriptor.provider_id))
+        return tuple(
+            sorted(self._providers.values(), key=lambda descriptor: descriptor.provider_id)
+        )
