@@ -7,14 +7,17 @@ from daily_nfl.providers import (
     NFLVERSE_DESCRIPTOR,
     AcquisitionRequest,
     DatasetKind,
+    HistoricalAvailability,
     NflverseAdapter,
     NormalizedAcquisition,
+    NormalizedRecordProvenance,
     PointInTimeFidelity,
     ProviderCapability,
     ProviderDescriptor,
     ProviderPayload,
     ProviderRegistrationError,
     ProviderRegistry,
+    ReliabilityTier,
     UnsupportedDatasetError,
 )
 
@@ -63,6 +66,17 @@ def test_available_at_cannot_be_after_observation() -> None:
         )
 
 
+def test_capability_requires_attribution_text_when_attribution_is_required() -> None:
+    with pytest.raises(ValueError, match="attribution_text"):
+        ProviderCapability(
+            dataset=DatasetKind.SCHEDULE,
+            point_in_time_fidelity=PointInTimeFidelity.PARTIAL,
+            cadence="DAILY",
+            license_class="CC",
+            attribution_required=True,
+        )
+
+
 def test_descriptor_rejects_duplicate_dataset_capabilities() -> None:
     capability = ProviderCapability(
         dataset=DatasetKind.SCHEDULE,
@@ -79,6 +93,25 @@ def test_descriptor_rejects_duplicate_dataset_capabilities() -> None:
             parser_version="v1",
             capabilities=(capability, capability),
         )
+
+
+def test_nflverse_capabilities_are_truthful_machine_readable_and_licensed() -> None:
+    assert {item.dataset for item in NFLVERSE_DESCRIPTOR.capabilities} == {
+        DatasetKind.SCHEDULE,
+        DatasetKind.PLAY_BY_PLAY,
+    }
+
+    for capability in NFLVERSE_DESCRIPTOR.capabilities:
+        assert capability.entity_coverage
+        assert capability.field_coverage
+        assert capability.earliest_season == 1999
+        assert capability.expected_latency is not None
+        assert capability.historical_availability is HistoricalAvailability.ARCHIVAL
+        assert capability.reliability_tier is ReliabilityTier.TIER_1
+        assert capability.license_id == "CC-BY-4.0"
+        assert capability.license_url is not None
+        assert capability.attribution_required is True
+        assert capability.attribution_text == "nflverse"
 
 
 def test_registry_is_idempotent_but_rejects_conflicting_provider_id() -> None:
@@ -109,7 +142,7 @@ def test_nflverse_adapter_rejects_undeclared_dataset_before_loader_call() -> Non
     adapter = NflverseAdapter(loader=loader)
 
     with pytest.raises(UnsupportedDatasetError, match="does not declare support"):
-        adapter.acquire(AcquisitionRequest(dataset=DatasetKind.OTHER))
+        adapter.acquire(AcquisitionRequest(dataset=DatasetKind.INJURY))
 
     assert calls == []
 
@@ -130,7 +163,19 @@ def test_nflverse_adapter_rejects_empty_raw_batch() -> None:
         adapter.acquire(AcquisitionRequest(dataset=DatasetKind.SCHEDULE))
 
 
-def test_normalized_acquisition_retains_multi_asset_evidence_lineage() -> None:
+def test_normalized_acquisition_requires_record_level_evidence_lineage() -> None:
+    provenance = (
+        NormalizedRecordProvenance(
+            source_record_id="play-1",
+            evidence_id="evidence-2025",
+            evidence_observation_id="observation-2025",
+        ),
+        NormalizedRecordProvenance(
+            source_record_id="play-2",
+            evidence_id="evidence-2026",
+            evidence_observation_id="observation-2026",
+        ),
+    )
     normalized = NormalizedAcquisition[str](
         provider_id="nflverse",
         dataset=DatasetKind.PLAY_BY_PLAY,
@@ -138,7 +183,17 @@ def test_normalized_acquisition_retains_multi_asset_evidence_lineage() -> None:
         provider_schema_version="fixture-v1",
         evidence_ids=("evidence-2025", "evidence-2026"),
         records=("record-1", "record-2"),
+        record_provenance=provenance,
     )
 
-    assert normalized.evidence_ids == ("evidence-2025", "evidence-2026")
-    assert normalized.records == ("record-1", "record-2")
+    assert normalized.record_provenance == provenance
+
+    with pytest.raises(ValueError, match="every normalized record"):
+        NormalizedAcquisition[str](
+            provider_id="nflverse",
+            dataset=DatasetKind.PLAY_BY_PLAY,
+            parser_version="NFLVERSE_ADAPTER_V1",
+            provider_schema_version="fixture-v1",
+            evidence_ids=("evidence-2025",),
+            records=("record-1",),
+        )

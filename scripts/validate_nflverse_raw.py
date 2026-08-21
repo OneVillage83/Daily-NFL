@@ -1,4 +1,4 @@
-"""Validate exact-byte nflverse acquisition, storage, and metadata persistence."""
+"""Validate exact-byte nflverse acquisition, storage, and provenance persistence."""
 
 from __future__ import annotations
 
@@ -20,6 +20,7 @@ from daily_nfl.providers import (  # noqa: E402
     NflverseAdapter,
     NflverseHttpLoader,
     record_stored_acquisition,
+    sha256_bytes,
 )
 
 
@@ -64,13 +65,39 @@ def main() -> int:
         schema_version = apply_migrations(connection)
         record_stored_acquisition(connection, acquisition)
         connection.commit()
-        raw_evidence_count_row = connection.execute(
-            "SELECT COUNT(*) FROM raw_evidence WHERE provider_id = ?",
-            (adapter.descriptor.provider_id,),
+        counts = connection.execute(
+            """
+            SELECT
+                (SELECT COUNT(*) FROM raw_evidence WHERE provider_id = ?),
+                (SELECT COUNT(*) FROM raw_evidence_observations WHERE provider_id = ?),
+                (SELECT COUNT(*) FROM provider_capability_snapshots WHERE provider_id = ?)
+            """,
+            (
+                adapter.descriptor.provider_id,
+                adapter.descriptor.provider_id,
+                adapter.descriptor.provider_id,
+            ),
         ).fetchone()
-        raw_evidence_count = int(raw_evidence_count_row[0]) if raw_evidence_count_row else 0
+        persisted_observation = connection.execute(
+            """
+            SELECT capability_id, license_id, attribution_required, attribution_text
+            FROM raw_evidence_observations
+            WHERE evidence_observation_id = ?
+            """,
+            (acquisition.evidence[0].evidence_observation_id,),
+        ).fetchone()
 
     evidence = acquisition.evidence[0]
+    stored_path = raw_root / evidence.artifact.relative_path
+    stored_bytes = stored_path.read_bytes()
+    stored_sha256 = sha256_bytes(stored_bytes)
+    if stored_sha256 != evidence.artifact.sha256:
+        raise RuntimeError("stored raw evidence checksum does not match acquisition artifact")
+    if stored_bytes != evidence.payload.content:
+        raise RuntimeError("stored raw evidence bytes do not match provider payload")
+    if counts is None or persisted_observation is None:
+        raise RuntimeError("M3 validation metadata was not persisted")
+
     result = {
         "database": str(database),
         "raw_root": str(raw_root),
@@ -78,14 +105,27 @@ def main() -> int:
         "provider_id": acquisition.descriptor.provider_id,
         "dataset": acquisition.request.dataset.value,
         "evidence_id": evidence.artifact.evidence_id,
+        "evidence_observation_id": evidence.evidence_observation_id,
         "sha256": evidence.artifact.sha256,
+        "stored_sha256": stored_sha256,
         "size_bytes": evidence.artifact.size_bytes,
         "relative_path": evidence.artifact.relative_path.as_posix(),
         "source_uri": evidence.payload.source_uri,
+        "published_at": (
+            evidence.payload.published_at.isoformat()
+            if evidence.payload.published_at is not None
+            else None
+        ),
         "observed_at": evidence.payload.observed_at.isoformat(),
         "available_at": evidence.payload.available_at.isoformat(),
         "ingested_at": evidence.ingested_at.isoformat(),
-        "raw_evidence_count": raw_evidence_count,
+        "raw_evidence_count": int(counts[0]),
+        "raw_observation_count": int(counts[1]),
+        "capability_snapshot_count": int(counts[2]),
+        "capability_id": str(persisted_observation[0]),
+        "license_id": persisted_observation[1],
+        "attribution_required": bool(persisted_observation[2]),
+        "attribution_text": persisted_observation[3],
     }
     print(json.dumps(result, sort_keys=True))
     return 0

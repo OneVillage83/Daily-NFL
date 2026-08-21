@@ -45,11 +45,12 @@ def test_unmapped_dataset_fails_closed() -> None:
         resolve_nflverse_assets(AcquisitionRequest(dataset=DatasetKind.INJURY))
 
 
-def test_http_loader_returns_exact_response_bytes_without_parsing() -> None:
+def test_http_loader_returns_exact_response_bytes_and_http_provenance() -> None:
     response = MagicMock()
     response.__enter__.return_value = response
     response.read.return_value = b"raw-parquet-bytes"
     response.headers.get_content_type.return_value = "application/octet-stream"
+    response.headers.get.return_value = "Thu, 20 Aug 2026 18:30:00 GMT"
 
     before = datetime.now(UTC)
     with patch("daily_nfl.providers.nflverse_http.urlopen", return_value=response):
@@ -63,3 +64,4 @@ def test_http_loader_returns_exact_response_bytes_without_parsing() -> None:
     assert payload.source_uri.endswith("/schedules/games.parquet")
     assert before <= payload.observed_at <= after
     assert payload.available_at == payload.observed_at
+    assert payload.published_at == datetime(2026, 8, 20, 18, 30, tzinfo=UTC)

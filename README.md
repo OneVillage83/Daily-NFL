@@ -8,9 +8,10 @@ Daily NFL is the NFL modeling engine for **The Daily Line**. Its governing archi
 - M0 Repository Bootstrap / Engineering Constitution: **ARCHITECTURE-CERTIFIED**
 - M1 Canonical Domain Contracts: **ARCHITECTURE-CERTIFIED**
 - M2 Persistence & Migration Foundation: **ARCHITECTURE-CERTIFIED**
-- M3 Raw Evidence & Provider Abstraction: provisionally implemented; **next architecture-certification target**
-- M4 through M6: provisionally implemented; each milestone must be architecture-certified in order before later work is treated as closed
-- M2 certification evidence: `docs/implementation/M2_ARCHITECTURE_CONFORMANCE_AUDIT.md` and `docs/implementation/M2_LOCAL_VALIDATION_20260821.md`
+- M3 Raw Evidence & Provider Abstraction: **ARCHITECTURE-CERTIFIED**
+- M4 Identity & Reconciliation Engine: provisionally implemented; **next architecture-certification target**
+- M5 through M6: provisionally implemented; each milestone must be architecture-certified in order before later work is treated as closed
+- M3 certification evidence: `docs/implementation/M3_ARCHITECTURE_CONFORMANCE_AUDIT.md` and `docs/implementation/M3_LOCAL_VALIDATION_20260821.md`
 
 The current certification authority is `docs/implementation/ARCHITECTURE_CERTIFICATION_LOG.md`. The older `PROJECT_CHECKPOINT_LOG.md` remains a historical implementation snapshot from before the formal certification sequence and is not allowed to override newer certification status.
 
@@ -111,3 +112,8 @@ M2 certification evidence:
 
 - `docs/implementation/M2_ARCHITECTURE_CONFORMANCE_AUDIT.md`
 - `docs/implementation/M2_LOCAL_VALIDATION_20260821.md`
+
+M3 certification evidence:
+
+- `docs/implementation/M3_ARCHITECTURE_CONFORMANCE_AUDIT.md`
+- `docs/implementation/M3_LOCAL_VALIDATION_20260821.md`

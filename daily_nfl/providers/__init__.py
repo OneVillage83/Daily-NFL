@@ -4,17 +4,24 @@ from daily_nfl.providers.contracts import (
     AcquisitionRequest,
     CostClass,
     DatasetKind,
+    HistoricalAvailability,
     NormalizedAcquisition,
+    NormalizedRecordProvenance,
     PointInTimeFidelity,
     ProviderAdapter,
     ProviderCapability,
     ProviderDescriptor,
     ProviderPayload,
+    ReliabilityTier,
 )
 from daily_nfl.providers.metadata import (
+    ProviderCapabilityConflictError,
     ProviderMetadataConflictError,
     RawEvidenceMetadataConflictError,
+    RawEvidenceObservationConflictError,
+    capability_id_for,
     record_provider,
+    record_provider_capability,
     record_stored_acquisition,
 )
 from daily_nfl.providers.nflverse import (
@@ -38,7 +45,13 @@ from daily_nfl.providers.raw_store import (
     sha256_bytes,
 )
 from daily_nfl.providers.registry import ProviderRegistrationError, ProviderRegistry
-from daily_nfl.providers.service import AcquisitionService, StoredAcquisition, StoredEvidence
+from daily_nfl.providers.service import (
+    AcquisitionService,
+    StoredAcquisition,
+    StoredEvidence,
+    UnsupportedProviderCapabilityError,
+    evidence_observation_id_for,
+)
 
 __all__ = [
     "AcquisitionRequest",
@@ -46,15 +59,18 @@ __all__ = [
     "CostClass",
     "DatasetKind",
     "FileSystemRawEvidenceStore",
+    "HistoricalAvailability",
     "NFLVERSE_DESCRIPTOR",
     "NFLVERSE_RELEASE_BASE",
     "NflverseAdapter",
     "NflverseAsset",
     "NflverseHttpLoader",
     "NormalizedAcquisition",
+    "NormalizedRecordProvenance",
     "PointInTimeFidelity",
     "ProviderAdapter",
     "ProviderCapability",
+    "ProviderCapabilityConflictError",
     "ProviderDescriptor",
     "ProviderMetadataConflictError",
     "ProviderPayload",
@@ -63,13 +79,19 @@ __all__ = [
     "RawEvidenceArtifact",
     "RawEvidenceCollisionError",
     "RawEvidenceMetadataConflictError",
+    "RawEvidenceObservationConflictError",
     "RawEvidenceStore",
+    "ReliabilityTier",
     "StoredAcquisition",
     "StoredEvidence",
     "UnsupportedDatasetError",
+    "UnsupportedProviderCapabilityError",
     "UnsupportedRawAssetMappingError",
+    "capability_id_for",
     "evidence_id_for",
+    "evidence_observation_id_for",
     "record_provider",
+    "record_provider_capability",
     "record_stored_acquisition",
     "resolve_nflverse_assets",
     "sha256_bytes",

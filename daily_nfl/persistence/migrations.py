@@ -5,10 +5,11 @@ from dataclasses import dataclass
 
 from daily_nfl.persistence.identity_schema import IDENTITY_RECONCILIATION_SCHEMA_SQL
 from daily_nfl.persistence.m2_conformance_schema import M2_CONFORMANCE_SCHEMA_SQL
+from daily_nfl.persistence.m3_provider_schema import M3_PROVIDER_SCHEMA_SQL
 from daily_nfl.persistence.pit_schema import PIT_SNAPSHOT_SCHEMA_SQL
 from daily_nfl.persistence.schema import INITIAL_SCHEMA_SQL
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,6 +35,11 @@ MIGRATIONS: tuple[Migration, ...] = (
         version=4,
         name="m2_architecture_conformance",
         sql=M2_CONFORMANCE_SCHEMA_SQL,
+    ),
+    Migration(
+        version=5,
+        name="m3_provider_provenance_conformance",
+        sql=M3_PROVIDER_SCHEMA_SQL,
     ),
 )
 
