@@ -39,7 +39,7 @@ MIGRATIONS: tuple[Migration, ...] = (
 
 
 class SchemaVersionError(RuntimeError):
-    """Raised when a database schema cannot be safely migrated."""
+    """Raised when a database schema cannot be safely migrated or trusted."""
 
 
 def _user_tables(connection: sqlite3.Connection) -> set[str]:
@@ -104,6 +104,29 @@ def _validate_migration_history(connection: sqlite3.Connection, current: int) ->
                 "migration history name mismatch: "
                 f"version {version} expected {expected_name!r}, found {name!r}"
             )
+
+
+def validate_schema_history(connection: sqlite3.Connection) -> int:
+    """Validate the version ledger without applying migrations.
+
+    Returns the highest valid recorded schema version. The caller may compare
+    that value with ``SCHEMA_VERSION`` when an exact current-schema check is
+    required. A non-empty unversioned database, future schema, sequence gap, or
+    renamed migration fails closed.
+    """
+    current = current_schema_version(connection)
+    latest = max(migration.version for migration in MIGRATIONS)
+
+    if current == 0 and _user_tables(connection):
+        raise SchemaVersionError(
+            "refusing to trust an unversioned or incomplete non-empty database"
+        )
+    if current > latest or current > SCHEMA_VERSION:
+        raise SchemaVersionError(
+            f"database schema version {current} is newer than supported version {SCHEMA_VERSION}"
+        )
+    _validate_migration_history(connection, current)
+    return current
 
 
 def apply_migrations(connection: sqlite3.Connection) -> int:
