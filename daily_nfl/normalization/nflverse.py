@@ -9,6 +9,7 @@ from daily_nfl.domain import (
     PlayEvent,
     PlayEventType,
     PlayExecution,
+    PlayId,
     PlayResult,
     PlayStateAfter,
     PlayType,
@@ -77,14 +78,17 @@ def classify_play_type(record: NflversePlayRecord) -> PlayType:
     return PlayType.OTHER
 
 
-def _modifiers(record: NflversePlayRecord, play_type: PlayType) -> frozenset[PlayDesignModifier]:
+def _modifiers(
+    record: NflversePlayRecord,
+    play_type: PlayType,
+) -> frozenset[PlayDesignModifier]:
     if play_type not in {PlayType.PASS, PlayType.RUSH, PlayType.SCRAMBLE, PlayType.SACK}:
         return frozenset()
 
     modifiers: set[PlayDesignModifier] = set()
     for enabled, modifier in (
         (record.play_action, PlayDesignModifier.PLAY_ACTION),
-        (record.rpo, PlayDesignModifier.RPO),
+        (record.rpo and play_type in {PlayType.PASS, PlayType.RUSH}, PlayDesignModifier.RPO),
         (record.screen, PlayDesignModifier.SCREEN),
         (record.shotgun, PlayDesignModifier.SHOTGUN),
         (record.under_center, PlayDesignModifier.UNDER_CENTER),
@@ -98,7 +102,10 @@ def _modifiers(record: NflversePlayRecord, play_type: PlayType) -> frozenset[Pla
     return frozenset(modifiers)
 
 
-def _score_change(record: NflversePlayRecord, next_record: NflversePlayRecord | None) -> int:
+def _score_change(
+    record: NflversePlayRecord,
+    next_record: NflversePlayRecord | None,
+) -> int:
     home_after = record.home_score_after
     away_after = record.away_score_after
     if home_after is None or away_after is None:
@@ -129,7 +136,7 @@ def _require_possession_codes(record: NflversePlayRecord) -> tuple[str, str]:
 def _build_events(
     *,
     record: NflversePlayRecord,
-    play_id,
+    play_id: PlayId,
     play_type: PlayType,
     score_change: int,
 ) -> tuple[PlayEvent, ...]:
