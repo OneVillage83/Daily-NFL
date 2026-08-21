@@ -61,6 +61,10 @@ def _require_aware(value: datetime | None, label: str) -> None:
         raise ValueError(f"{label} must be timezone-aware")
 
 
+def _is_sha256(value: str) -> bool:
+    return len(value) == 64 and all(character in "0123456789abcdefABCDEF" for character in value)
+
+
 @dataclass(frozen=True, slots=True)
 class PredictionCutoff:
     game_id: GameId
@@ -136,6 +140,12 @@ class PITInputRef:
         ):
             if not value.strip():
                 raise ValueError(f"{label} cannot be blank")
+        if self.evidence_id is not None and not self.evidence_id.strip():
+            raise ValueError("evidence_id cannot be blank when present")
+        if self.subject_game_id is not None and not str(self.subject_game_id).strip():
+            raise ValueError("subject_game_id cannot be blank when present")
+        if self.payload_sha256 is not None and not _is_sha256(self.payload_sha256):
+            raise ValueError("payload_sha256 must be a SHA-256 hex digest")
         for value, label in (
             (self.available_at, "available_at"),
             (self.effective_at, "effective_at"),
