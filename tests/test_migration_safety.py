@@ -94,6 +94,7 @@ def test_observation_tables_have_append_only_triggers(tmp_path: Path) -> None:
         "game_result_observations",
         "game_results",
         "game_result_sources",
+        "identity_reconciliation_evidence",
         "schema_migrations",
     }
     expected = {
