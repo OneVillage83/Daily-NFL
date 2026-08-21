@@ -122,7 +122,7 @@ def test_changing_one_input_changes_snapshot_identity() -> None:
     assert original.snapshot_id != changed.snapshot_id
 
 
-def test_snapshot_persistence_is_idempotent_and_append_only(tmp_path: Path) -> None:
+def test_snapshot_persistence_is_idempotent_sealed_and_append_only(tmp_path: Path) -> None:
     database = tmp_path / "pit.db"
 
     with open_database(database) as connection:
@@ -138,7 +138,31 @@ def test_snapshot_persistence_is_idempotent_and_append_only(tmp_path: Path) -> N
 
         assert connection.execute("SELECT COUNT(*) FROM pit_snapshots").fetchone()[0] == 1
         assert connection.execute("SELECT COUNT(*) FROM pit_snapshot_inputs").fetchone()[0] == 2
+        assert connection.execute("SELECT COUNT(*) FROM pit_snapshot_seals").fetchone()[0] == 1
 
+        with pytest.raises(sqlite3.IntegrityError, match="membership cannot change"):
+            connection.execute(
+                """
+                INSERT INTO pit_snapshot_inputs(
+                    snapshot_id,
+                    input_kind,
+                    input_id,
+                    source_table,
+                    available_at,
+                    availability_method,
+                    availability_confidence
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    manifest.snapshot_id,
+                    PITInputKind.OTHER.value,
+                    "late-added-input",
+                    "fixture_source",
+                    cutoff.prediction_time.isoformat(),
+                    AvailabilityMethod.SOURCE_TIMESTAMP.value,
+                    AvailabilityConfidence.HIGH.value,
+                ),
+            )
         with pytest.raises(sqlite3.IntegrityError, match="append-only"):
             connection.execute(
                 "UPDATE pit_snapshots SET policy_version = 'changed' WHERE snapshot_id = ?",
