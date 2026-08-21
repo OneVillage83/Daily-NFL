@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from urllib.request import Request, urlopen
 
 from daily_nfl.domain import AvailabilityConfidence, AvailabilityMethod
@@ -55,6 +56,18 @@ def resolve_nflverse_assets(request: AcquisitionRequest) -> tuple[NflverseAsset,
     )
 
 
+def _parse_http_datetime(value: str | None) -> datetime | None:
+    if value is None or not value.strip():
+        return None
+    try:
+        parsed = parsedate_to_datetime(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
+
+
 @dataclass(frozen=True, slots=True)
 class NflverseHttpLoader:
     """Download exact nflverse release bytes without parsing them first."""
@@ -82,6 +95,7 @@ class NflverseHttpLoader:
         with urlopen(request, timeout=self.timeout_seconds) as response:  # noqa: S310
             content = response.read()
             content_type = response.headers.get_content_type() or "application/octet-stream"
+            last_modified = response.headers.get("Last-Modified")
 
         observed_at = datetime.now(UTC)
         return ProviderPayload(
@@ -92,4 +106,5 @@ class NflverseHttpLoader:
             available_at=observed_at,
             availability_method=AvailabilityMethod.OUR_OBSERVATION_TIME,
             availability_confidence=AvailabilityConfidence.HIGH,
+            published_at=_parse_http_datetime(last_modified),
         )
