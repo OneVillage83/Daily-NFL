@@ -11,13 +11,25 @@ from daily_nfl.normalization.nflverse import (
     classify_play_type,
     normalize_nflverse_play,
 )
+from daily_nfl.normalization.persistence import (
+    NormalizationProvenance,
+    NormalizedPlayConflictError,
+    normalized_play_observation_id,
+    record_normalized_play,
+    serialize_normalized_play,
+)
 
 __all__ = [
     "NflverseGameContext",
     "NflversePlayRecord",
+    "NormalizationProvenance",
     "NormalizedPlayBundle",
+    "NormalizedPlayConflictError",
     "PlayNormalizationError",
     "ProviderPenaltyRecord",
     "classify_play_type",
     "normalize_nflverse_play",
+    "normalized_play_observation_id",
+    "record_normalized_play",
+    "serialize_normalized_play",
 ]
