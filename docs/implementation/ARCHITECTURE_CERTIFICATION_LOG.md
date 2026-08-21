@@ -38,7 +38,7 @@ M0  Repository Bootstrap / Engineering Constitution    ARCHITECTURE-CERTIFIED
 M1  Canonical Domain Contracts                         ARCHITECTURE-CERTIFIED
 M2  Persistence & Migration Foundation                 ARCHITECTURE-CERTIFIED
 M3  Raw Evidence & Provider Abstraction                ARCHITECTURE-CERTIFIED
-M4  Identity & Reconciliation Engine                   PROVISIONAL — AUDIT NEXT
+M4  Identity & Reconciliation Engine                   AUDIT/REMEDIATION COMPLETE — CERTIFICATION GATES PENDING
 M5  Historical PIT Engine                              PROVISIONAL
 M6  Canonical Play / Drive Normalization               PROVISIONAL
 M6B Real nflverse PBP Validation                       COMPLETED IN SUBSTANCE / NOT A SUBSTITUTE FOR M6 CERTIFICATION
@@ -273,6 +273,46 @@ M3 — ARCHITECTURE-CERTIFIED
 
 ---
 
+## 2026-08-21 — M4 Audit / Remediation Complete
+
+**Milestone:** Identity & Reconciliation Engine  
+**Architecture:** F-3  
+**Certification:** WITHHELD pending executable gates
+
+Static remediation now includes:
+
+- reconciliation vocabulary aligned to the certified F-3 identity vocabulary;
+- missing opaque roster-stint / coach-role / injury-observation / depth-chart generators;
+- forward-only migration v6;
+- append-only reconciliation evidence linked to M3 raw evidence and acquisition observations;
+- database requirement that new crosswalks cite an existing reconciliation decision;
+- atomic decision/evidence/crosswalk persistence for resolved bindings;
+- season-scoped TeamSeason crosswalk validity;
+- fail-closed handling of legacy timeless TeamSeason mappings used for the wrong season;
+- game existing-crosswalk context validation;
+- drive reconciliation by canonical game/sequence/context;
+- play reconciliation by canonical game/sequence/context;
+- explicit supersession requirement for changes in verification/method/confidence;
+- dedicated real nflverse schedule-row reconciliation validation.
+
+Evidence:
+
+- `docs/implementation/M4_ARCHITECTURE_CONFORMANCE_AUDIT.md`
+
+Current state:
+
+```text
+M4 STATIC AUDIT: COMPLETE
+M4 REMEDIATION: IMPLEMENTED
+M4 MIGRATION v6: IMPLEMENTED
+M4 LOCAL QUALITY GATE: PENDING
+M4 SQLITE v6 GATE: PENDING
+M4 REAL NFLVERSE RECONCILIATION GATE: PENDING
+M4 ARCHITECTURE CERTIFICATION: WITHHELD
+```
+
+---
+
 ## Next Certification Target
 
 ```text
@@ -280,4 +320,4 @@ M4 — Identity & Reconciliation Engine
 Primary architecture dependency: F-3 — Canonical Identity & Reconciliation
 ```
 
-M4 must consume the certified M0-M3 contracts. Existing reconciliation code is provisional evidence to audit, not authority to redefine canonical identity semantics.
+M4 remains the active target until all executable gates pass. M5 does not become the certification target merely because provisional M5 code exists.
