@@ -81,6 +81,17 @@ def test_base_pbp_does_not_infer_ftn_modifiers() -> None:
     assert not record.designed_qb_run
 
 
+def test_negative_timeout_sentinel_becomes_unknown() -> None:
+    record = extract_nflverse_play_record(
+        _row(
+            posteam_timeouts_remaining=-1.0,
+            defteam_timeouts_remaining=2.0,
+        )
+    )
+    assert record.away_timeouts_remaining is None
+    assert record.home_timeouts_remaining == 2
+
+
 def test_missing_preplay_score_fails_closed() -> None:
     with pytest.raises(NflverseRowExtractionError, match="pre-play home/away score"):
         extract_nflverse_play_record(_row(posteam_score=None))
