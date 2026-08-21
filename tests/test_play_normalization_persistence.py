@@ -1,4 +1,5 @@
 import json
+import sqlite3
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import UUID
@@ -29,7 +30,7 @@ from daily_nfl.reconciliation import (
 )
 
 
-def _context_and_game(connection) -> NflverseGameContext:
+def _context_and_game(connection: sqlite3.Connection) -> NflverseGameContext:
     repository = IdentityRepository(connection)
     home = new_franchise_id(UUID("11111111-1111-1111-1111-111111111111"))
     away = new_franchise_id(UUID("22222222-2222-2222-2222-222222222222"))
@@ -208,5 +209,8 @@ def test_provider_revision_adds_observation_without_replacing_canonical_play(
 
     assert play_count == 1
     assert [row[0] for row in observations] == ["r1", "r2"]
-    yards = [json.loads(str(row[1]))["result"]["official_yards_gained"] for row in observations]
+    yards = [
+        json.loads(str(row[1]))["result"]["official_yards_gained"]
+        for row in observations
+    ]
     assert yards == [9, 11]
