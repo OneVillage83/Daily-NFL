@@ -53,10 +53,11 @@ def derive_knowledge_timestamp(
 ) -> KnowledgeTimestamp:
     """Derive the earliest defensible historical availability clock.
 
-    Precedence intentionally favors explicit source/release timestamps, then
-    our own observation time. Inferred report dates are weak evidence. If no
-    historical availability evidence exists, strict mode fails closed; a
-    permissive caller may use ingestion time with UNKNOWN/LOW confidence.
+    Precedence favors explicit source timestamps/publication times, then an
+    archived release timestamp, then our own observation time. Inferred report
+    dates remain weak evidence. With no historical availability evidence,
+    strict mode fails closed; permissive callers may retain ingestion time as
+    UNKNOWN/LOW evidence without treating it as historically PIT-safe.
     """
 
     available_at: datetime | None = None
@@ -65,6 +66,10 @@ def derive_knowledge_timestamp(
 
     if evidence.source_timestamp is not None:
         available_at = evidence.source_timestamp
+        method = AvailabilityMethod.SOURCE_TIMESTAMP
+        confidence = AvailabilityConfidence.HIGH
+    elif evidence.published_at is not None:
+        available_at = evidence.published_at
         method = AvailabilityMethod.SOURCE_TIMESTAMP
         confidence = AvailabilityConfidence.HIGH
     elif evidence.archived_release_time is not None:
