@@ -8,7 +8,14 @@ from uuid import UUID
 
 import pytest
 
-from daily_nfl.domain import AvailabilityConfidence, AvailabilityMethod, PersonId
+from daily_nfl.domain import (
+    AvailabilityConfidence,
+    AvailabilityMethod,
+    DriveId,
+    GameId,
+    PlayId,
+    PossessionSegmentId,
+)
 from daily_nfl.persistence import SCHEMA_VERSION, apply_migrations, open_database
 from daily_nfl.persistence.migrations import MIGRATIONS
 from daily_nfl.providers import (
@@ -91,7 +98,7 @@ def _record_fixture_evidence(
 
 def _seed_game_drive_play(
     connection: sqlite3.Connection,
-) -> tuple[str, str, str, str]:
+) -> tuple[GameId, PossessionSegmentId, DriveId, PlayId]:
     repository = IdentityRepository(connection)
     home = new_franchise_id(UUID("11111111-1111-1111-1111-111111111111"))
     away = new_franchise_id(UUID("22222222-2222-2222-2222-222222222222"))
@@ -171,7 +178,7 @@ def _seed_game_drive_play(
             str(segment_id),
         ),
     )
-    return str(game_id), str(segment_id), str(drive_id), str(play_id)
+    return game_id, segment_id, drive_id, play_id
 
 
 def _apply_through_v5(connection: sqlite3.Connection) -> None:
@@ -363,10 +370,10 @@ def test_drive_and_play_provider_ids_can_change_without_canonical_identity_chang
             hint=play_hint,
         )
 
-        assert first_drive.selected_canonical_entity_id == drive_id
-        assert second_drive.selected_canonical_entity_id == drive_id
-        assert first_play.selected_canonical_entity_id == play_id
-        assert second_play.selected_canonical_entity_id == play_id
+        assert first_drive.selected_canonical_entity_id == str(drive_id)
+        assert second_drive.selected_canonical_entity_id == str(drive_id)
+        assert first_play.selected_canonical_entity_id == str(play_id)
+        assert second_play.selected_canonical_entity_id == str(play_id)
 
 
 def test_resolution_metadata_change_requires_explicit_supersession(tmp_path: Path) -> None:
@@ -433,6 +440,33 @@ def test_resolution_metadata_change_requires_explicit_supersession(tmp_path: Pat
         assert len(current) == 1
         assert current[0].verified is True
         assert current[0].supersedes_crosswalk_id == existing.crosswalk_id
+
+
+def test_reconciliation_evidence_is_append_only(tmp_path: Path) -> None:
+    database = tmp_path / "identity.db"
+
+    with _open_identity_database(database) as connection:
+        evidence = _record_fixture_evidence(connection, tmp_path)
+        decision = IdentityReconciler(IdentityRepository(connection)).resolve(
+            ExternalIdentity("nflverse", "PLAYER", "missing-player"),
+            CanonicalEntityType.PLAYER,
+            evidence=(evidence,),
+        )
+
+        with pytest.raises(sqlite3.IntegrityError, match="append-only"):
+            connection.execute(
+                """
+                UPDATE identity_reconciliation_evidence
+                SET evidence_kind = 'CHANGED'
+                WHERE decision_id = ?
+                """,
+                (decision.decision_id,),
+            )
+        with pytest.raises(sqlite3.IntegrityError, match="append-only"):
+            connection.execute(
+                "DELETE FROM identity_reconciliation_evidence WHERE decision_id = ?",
+                (decision.decision_id,),
+            )
 
 
 def test_v6_migration_preserves_v5_identity_history(tmp_path: Path) -> None:
