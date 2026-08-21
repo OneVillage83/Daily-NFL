@@ -1,3 +1,4 @@
+import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID
@@ -20,7 +21,7 @@ from daily_nfl.reconciliation import (
 )
 
 
-def _open_identity_database(path: Path):
+def _open_identity_database(path: Path) -> sqlite3.Connection:
     connection = open_database(path)
     apply_migrations(connection)
     record_provider(connection, NFLVERSE_DESCRIPTOR)
