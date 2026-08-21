@@ -253,9 +253,10 @@ class IdentityReconciler:
         provider_id: str,
         external_game_id: str,
         hint: GameIdentityHint,
-        max_kickoff_delta: timedelta = timedelta(days=7),
+        max_kickoff_delta: timedelta | None = None,
     ) -> ReconciliationDecision:
-        if max_kickoff_delta < timedelta(0):
+        kickoff_delta = timedelta(days=7) if max_kickoff_delta is None else max_kickoff_delta
+        if kickoff_delta < timedelta(0):
             raise ValueError("max_kickoff_delta cannot be negative")
         external = ExternalIdentity(
             provider_id=provider_id,
@@ -280,8 +281,7 @@ class IdentityReconciler:
             rows = tuple(
                 row
                 for row in rows
-                if abs(_parse_utc(row["scheduled_kickoff"]) - kickoff)
-                <= max_kickoff_delta
+                if abs(_parse_utc(row["scheduled_kickoff"]) - kickoff) <= kickoff_delta
             )
 
         confidence = 0.995 if hint.week is not None else 0.98
