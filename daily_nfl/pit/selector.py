@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Generic, TypeVar
 
 from daily_nfl.domain import AvailabilityConfidence, AvailabilityMethod
 from daily_nfl.pit.contracts import PITInputRef, PITPolicy, PredictionCutoff
@@ -21,11 +20,8 @@ ConfidenceRank = {
 }
 
 
-T = TypeVar("T")
-
-
 @dataclass(frozen=True, slots=True)
-class PITObservation(Generic[T]):
+class PITObservation[T]:
     logical_key: str
     input_ref: PITInputRef
     value: T
@@ -66,7 +62,7 @@ def _rank(input_ref: PITInputRef) -> tuple[datetime, datetime, datetime]:
     )
 
 
-def select_latest_as_of(
+def select_latest_as_of[T](
     observations: tuple[PITObservation[T], ...],
     *,
     cutoff: PredictionCutoff,
