@@ -42,21 +42,29 @@ class PlayType(StrEnum):
 
 
 class PlayDesignModifier(StrEnum):
-    """Play-design concepts layered on top of the primary play type.
+    """Play-design mechanics layered on top of the primary play family.
 
-    PLAY_ACTION intentionally refers only to the football concept. The
+    PLAY_ACTION intentionally refers only to the real football concept. The
     containing domain object is named PlayExecution, never PlayAction.
     """
 
     PLAY_ACTION = "PLAY_ACTION"
     RPO = "RPO"
     SCREEN = "SCREEN"
-    SHOTGUN = "SHOTGUN"
-    UNDER_CENTER = "UNDER_CENTER"
+    BOOT = "BOOT"
+    NAKED_BOOT = "NAKED_BOOT"
+    DRAW = "DRAW"
+    READ_OPTION = "READ_OPTION"
+    SPEED_OPTION = "SPEED_OPTION"
+    DESIGNED_QB_RUN = "DESIGNED_QB_RUN"
+    DROPBACK = "DROPBACK"
+    QUICK_GAME = "QUICK_GAME"
+    EMPTY = "EMPTY"
     MOTION = "MOTION"
     SHIFT = "SHIFT"
+    UNDER_CENTER = "UNDER_CENTER"
+    SHOTGUN = "SHOTGUN"
     NO_HUDDLE = "NO_HUDDLE"
-    DESIGNED_QB_RUN = "DESIGNED_QB_RUN"
 
 
 class PlayEventType(StrEnum):

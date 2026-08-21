@@ -6,10 +6,11 @@ Daily NFL is the NFL modeling engine for **The Daily Line**. Its governing archi
 
 - F-0 through F-24 architecture: complete and versioned
 - M0 Repository Bootstrap / Engineering Constitution: **ARCHITECTURE-CERTIFIED**
-- M1 through M6: provisionally implemented; each milestone must be architecture-certified in order before later work is treated as closed
-- Next formal certification target: **M1 — Canonical Domain Contracts**, audited against F-1, F-3, and F-5
+- M1 Canonical Domain Contracts: **ARCHITECTURE-CERTIFIED**
+- M2 through M6: provisionally implemented; each milestone must be architecture-certified in order before later work is treated as closed
+- Next formal certification target: **M2 — Persistence & Migration Foundation**, audited against F-2, F-3, F-4, and F-5
 
-The durable project resume point is `docs/implementation/PROJECT_CHECKPOINT_LOG.md`. Milestone-specific conformance evidence belongs in `docs/implementation/`.
+The current certification authority is `docs/implementation/ARCHITECTURE_CERTIFICATION_LOG.md`. The older `PROJECT_CHECKPOINT_LOG.md` remains a historical implementation snapshot from before the formal certification sequence and is not allowed to override newer certification status.
 
 ## Engineering baseline
 
@@ -86,14 +87,20 @@ Implementation roadmap:
 
 - `docs/implementation/IMPLEMENTATION_ROADMAP_V1.md`
 
-Project checkpoint:
+Architecture certification log:
+
+- `docs/implementation/ARCHITECTURE_CERTIFICATION_LOG.md`
+
+Historical consolidated checkpoint:
 
 - `docs/implementation/PROJECT_CHECKPOINT_LOG.md`
 
-M0 conformance audit:
+M0 certification evidence:
 
 - `docs/implementation/M0_ARCHITECTURE_CONFORMANCE_AUDIT.md`
-
-M0 local validation evidence:
-
 - `docs/implementation/M0_LOCAL_VALIDATION_20260821.md`
+
+M1 certification evidence:
+
+- `docs/implementation/M1_ARCHITECTURE_CONFORMANCE_AUDIT.md`
+- `docs/implementation/M1_LOCAL_VALIDATION_20260821.md`

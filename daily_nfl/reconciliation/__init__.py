@@ -11,10 +11,13 @@ from daily_nfl.reconciliation.canonical import (
     new_franchise_id,
     new_person_id,
     new_reconciliation_decision_id,
+    participation_id_for,
+    penalty_id_for,
     play_event_id_for,
     play_id_for,
     player_id_for_person,
     possession_id_for,
+    possession_segment_id_for,
     team_season_id_for,
 )
 from daily_nfl.reconciliation.contracts import (
@@ -67,9 +70,12 @@ __all__ = [
     "new_franchise_id",
     "new_person_id",
     "new_reconciliation_decision_id",
+    "participation_id_for",
+    "penalty_id_for",
     "play_event_id_for",
     "play_id_for",
     "player_id_for_person",
     "possession_id_for",
+    "possession_segment_id_for",
     "team_season_id_for",
 ]

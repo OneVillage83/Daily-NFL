@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from daily_nfl.domain import (
+    ObservedPhysicalOutcome,
     Penalty,
     Period,
     PlayDesignModifier,
@@ -23,9 +24,11 @@ from daily_nfl.normalization.contracts import (
 )
 from daily_nfl.reconciliation import (
     drive_id_for,
+    penalty_id_for,
     play_event_id_for,
     play_id_for,
     possession_id_for,
+    possession_segment_id_for,
 )
 
 
@@ -95,7 +98,10 @@ def _modifiers(
         (record.motion, PlayDesignModifier.MOTION),
         (record.shift, PlayDesignModifier.SHIFT),
         (record.no_huddle, PlayDesignModifier.NO_HUDDLE),
-        (record.designed_qb_run, PlayDesignModifier.DESIGNED_QB_RUN),
+        (
+            record.designed_qb_run and play_type is PlayType.RUSH,
+            PlayDesignModifier.DESIGNED_QB_RUN,
+        ),
     ):
         if enabled:
             modifiers.add(modifier)
@@ -231,6 +237,10 @@ def normalize_nflverse_play(
         away_score=record.away_score_before,
         home_timeouts_remaining=record.home_timeouts_remaining,
         away_timeouts_remaining=record.away_timeouts_remaining,
+        possession_segment_id=possession_segment_id_for(
+            context.game_id,
+            possession_sequence,
+        ),
     )
 
     play_type = classify_play_type(record)
@@ -276,10 +286,14 @@ def normalize_nflverse_play(
         )
 
     official_yards = None if record.no_play else record.official_yards_gained
+    physical_outcome = (
+        None
+        if record.physical_yards_gained is None
+        else ObservedPhysicalOutcome(yards_gained=record.physical_yards_gained)
+    )
     result = PlayResult(
         play_id=play_id,
         official_yards_gained=official_yards,
-        physical_yards_gained=record.physical_yards_gained,
         first_down=record.first_down and not record.no_play,
         touchdown=record.touchdown and not record.no_play,
         safety=record.safety and not record.no_play,
@@ -291,9 +305,11 @@ def normalize_nflverse_play(
         possession_changed=possession_changed,
         score_change=score_change,
         no_play=record.no_play,
+        physical_outcome=physical_outcome,
     )
     penalties = tuple(
         Penalty(
+            penalty_id=penalty_id_for(play_id, sequence),
             play_id=play_id,
             team_season_id=context.team_id_for_code(penalty.team_code),
             penalty_type=penalty.penalty_type,
@@ -304,7 +320,7 @@ def normalize_nflverse_play(
             nullifies_play=penalty.nullifies_play,
             enforcement_spot=penalty.enforcement_spot,
         )
-        for penalty in record.penalties
+        for sequence, penalty in enumerate(record.penalties, start=1)
     )
     events = _build_events(
         record=record,
