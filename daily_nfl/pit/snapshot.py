@@ -8,7 +8,12 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from daily_nfl.pit.contracts import PITInputRef, PITPolicy, PredictionCutoff
+from daily_nfl.pit.contracts import (
+    DEFAULT_PIT_POLICY,
+    PITInputRef,
+    PITPolicy,
+    PredictionCutoff,
+)
 from daily_nfl.pit.leakage import assert_no_leakage
 
 
@@ -68,7 +73,7 @@ def build_snapshot_manifest(
     *,
     cutoff: PredictionCutoff,
     inputs: tuple[PITInputRef, ...],
-    policy: PITPolicy = PITPolicy(),
+    policy: PITPolicy = DEFAULT_PIT_POLICY,
 ) -> PITSnapshotManifest:
     """Validate and hash the exact information set available at a prediction cutoff."""
 
