@@ -4,10 +4,11 @@ import sqlite3
 from dataclasses import dataclass
 
 from daily_nfl.persistence.identity_schema import IDENTITY_RECONCILIATION_SCHEMA_SQL
+from daily_nfl.persistence.m2_conformance_schema import M2_CONFORMANCE_SCHEMA_SQL
 from daily_nfl.persistence.pit_schema import PIT_SNAPSHOT_SCHEMA_SQL
 from daily_nfl.persistence.schema import INITIAL_SCHEMA_SQL
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,6 +30,11 @@ MIGRATIONS: tuple[Migration, ...] = (
         name="historical_pit_snapshot_foundation",
         sql=PIT_SNAPSHOT_SCHEMA_SQL,
     ),
+    Migration(
+        version=4,
+        name="m2_architecture_conformance",
+        sql=M2_CONFORMANCE_SCHEMA_SQL,
+    ),
 )
 
 
@@ -48,17 +54,56 @@ def _user_tables(connection: sqlite3.Connection) -> set[str]:
     return {str(row[0]) for row in rows}
 
 
-def current_schema_version(connection: sqlite3.Connection) -> int:
-    table_exists = connection.execute(
+def _migration_table_exists(connection: sqlite3.Connection) -> bool:
+    row = connection.execute(
         "SELECT 1 FROM sqlite_master WHERE type='table' AND name='schema_migrations'"
     ).fetchone()
-    if table_exists is None:
+    return row is not None
+
+
+def current_schema_version(connection: sqlite3.Connection) -> int:
+    if not _migration_table_exists(connection):
         return 0
 
     row = connection.execute("SELECT COALESCE(MAX(version), 0) FROM schema_migrations").fetchone()
     if row is None:
         return 0
     return int(row[0])
+
+
+def _validate_migration_history(connection: sqlite3.Connection, current: int) -> None:
+    """Fail closed if the recorded migration ledger is incomplete or altered."""
+    if current == 0:
+        return
+
+    rows = connection.execute(
+        "SELECT version, name FROM schema_migrations ORDER BY version"
+    ).fetchall()
+    expected = {migration.version: migration.name for migration in MIGRATIONS}
+
+    if len(rows) != current:
+        raise SchemaVersionError(
+            "migration history is incomplete: "
+            f"highest version is {current} but ledger contains {len(rows)} row(s)"
+        )
+
+    for expected_version in range(1, current + 1):
+        row = rows[expected_version - 1]
+        version = int(row[0])
+        name = str(row[1])
+        if version != expected_version:
+            raise SchemaVersionError(
+                "migration history contains a sequence gap: "
+                f"expected version {expected_version}, found {version}"
+            )
+        expected_name = expected.get(version)
+        if expected_name is None:
+            raise SchemaVersionError(f"migration version {version} is not supported by this code")
+        if name != expected_name:
+            raise SchemaVersionError(
+                "migration history name mismatch: "
+                f"version {version} expected {expected_name!r}, found {name!r}"
+            )
 
 
 def apply_migrations(connection: sqlite3.Connection) -> int:
@@ -74,6 +119,7 @@ def apply_migrations(connection: sqlite3.Connection) -> int:
         raise SchemaVersionError(
             f"database schema version {current} is newer than supported version {SCHEMA_VERSION}"
         )
+    _validate_migration_history(connection, current)
 
     expected_next = current + 1
     for migration in MIGRATIONS:
@@ -103,4 +149,5 @@ def apply_migrations(connection: sqlite3.Connection) -> int:
         current = migration.version
         expected_next = current + 1
 
+    _validate_migration_history(connection, current)
     return current
