@@ -9,6 +9,8 @@ from daily_nfl.reconciliation import (
     CanonicalEntityType,
     ExternalIdentity,
     FRANCHISE_ENTITY_TYPE,
+    GSIS_AUTHORITY_DESCRIPTOR,
+    GSIS_AUTHORITY_PROVIDER_ID,
     IdentityReconciler,
     IdentityRepository,
     MatchMethod,
@@ -21,6 +23,7 @@ def _open_identity_database(path: Path) -> sqlite3.Connection:
     connection = open_database(path)
     apply_migrations(connection)
     record_provider(connection, NFLVERSE_DESCRIPTOR)
+    record_provider(connection, GSIS_AUTHORITY_DESCRIPTOR)
     return connection
 
 
@@ -36,17 +39,14 @@ def test_gsis_bootstraps_opaque_player_once_and_reuses_crosswalk(tmp_path: Path)
         )
 
         first = reconciler.resolve_or_create_gsis_player(
-            provider_id="nflverse",
             gsis_id="00-0033873",
             canonical_name="Fixture Player",
         )
-        second = reconciler.resolve_or_create_gsis_player(
-            provider_id="nflverse",
-            gsis_id="00-0033873",
-        )
+        second = reconciler.resolve_or_create_gsis_player(gsis_id="00-0033873")
 
         assert first.resolved
         assert second.resolved
+        assert first.external_identity.provider_id == GSIS_AUTHORITY_PROVIDER_ID
         assert first.selected_canonical_entity_id == second.selected_canonical_entity_id
         assert first.selected_canonical_entity_id != "00-0033873"
         assert first.match_method is MatchMethod.TRUSTED_EXTERNAL_ID
