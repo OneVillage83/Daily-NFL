@@ -149,10 +149,16 @@ WHEN
     OR NEW.venue_id IS NOT OLD.venue_id
     OR NEW.scheduled_kickoff IS NOT OLD.scheduled_kickoff
     OR NEW.neutral_site IS NOT OLD.neutral_site
-    OR (OLD.competition_id IS NOT NULL AND NEW.competition_id IS NOT OLD.competition_id)
-    OR (OLD.competition_id IS NULL AND (NEW.competition_id IS NULL OR trim(NEW.competition_id) = ''))
+    OR (
+        OLD.competition_id IS NOT NULL
+        AND NEW.competition_id IS NOT OLD.competition_id
+    )
+    OR (
+        OLD.competition_id IS NULL
+        AND (NEW.competition_id IS NULL OR trim(NEW.competition_id) = '')
+    )
 BEGIN
-    SELECT RAISE(ABORT, 'games canonical identity is append-only after explicit legacy competition backfill');
+    SELECT RAISE(ABORT, 'games canonical identity is immutable after legacy backfill');
 END;
 CREATE TRIGGER games_no_delete
 BEFORE DELETE ON games
@@ -180,11 +186,13 @@ WHEN
     OR NEW.game_id IS NOT OLD.game_id
     OR NEW.possession_id IS NOT OLD.possession_id
     OR NEW.canonical_sequence IS NOT OLD.canonical_sequence
-    OR (OLD.possession_segment_id IS NOT NULL
-        AND NEW.possession_segment_id IS NOT OLD.possession_segment_id)
+    OR (
+        OLD.possession_segment_id IS NOT NULL
+        AND NEW.possession_segment_id IS NOT OLD.possession_segment_id
+    )
     OR (OLD.possession_segment_id IS NULL AND NEW.possession_segment_id IS NULL)
 BEGIN
-    SELECT RAISE(ABORT, 'drives canonical identity is append-only after explicit legacy segment backfill');
+    SELECT RAISE(ABORT, 'drive identity is immutable after legacy segment backfill');
 END;
 CREATE TRIGGER drives_no_delete
 BEFORE DELETE ON drives
@@ -200,11 +208,13 @@ WHEN
     OR NEW.drive_id IS NOT OLD.drive_id
     OR NEW.possession_id IS NOT OLD.possession_id
     OR NEW.canonical_sequence IS NOT OLD.canonical_sequence
-    OR (OLD.possession_segment_id IS NOT NULL
-        AND NEW.possession_segment_id IS NOT OLD.possession_segment_id)
+    OR (
+        OLD.possession_segment_id IS NOT NULL
+        AND NEW.possession_segment_id IS NOT OLD.possession_segment_id
+    )
     OR (OLD.possession_segment_id IS NULL AND NEW.possession_segment_id IS NULL)
 BEGIN
-    SELECT RAISE(ABORT, 'plays canonical identity is append-only after explicit legacy segment backfill');
+    SELECT RAISE(ABORT, 'play identity is immutable after legacy segment backfill');
 END;
 CREATE TRIGGER plays_no_delete
 BEFORE DELETE ON plays
