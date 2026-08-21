@@ -142,13 +142,57 @@ def _input_row_values(snapshot_id: str, input_ref: PITInputRef) -> tuple[object,
     )
 
 
+def _is_sealed(connection: sqlite3.Connection, snapshot_id: str) -> bool:
+    row = connection.execute(
+        "SELECT 1 FROM pit_snapshot_seals WHERE snapshot_id = ?",
+        (snapshot_id,),
+    ).fetchone()
+    return row is not None
+
+
+def _verify_existing_snapshot(
+    connection: sqlite3.Connection,
+    manifest: PITSnapshotManifest,
+    existing: sqlite3.Row,
+) -> None:
+    if not _is_sealed(connection, manifest.snapshot_id):
+        raise PITSnapshotConflictError(
+            f"stored PIT snapshot {manifest.snapshot_id!r} is incomplete/unsealed"
+        )
+    values = _snapshot_row_values(manifest)
+    if tuple(existing) != values:
+        raise PITSnapshotConflictError(
+            f"stored PIT snapshot {manifest.snapshot_id!r} conflicts with manifest"
+        )
+    stored_inputs = connection.execute(
+        """
+        SELECT snapshot_id, input_kind, input_id, source_table, evidence_id,
+               subject_game_id, available_at, availability_method,
+               availability_confidence, effective_at, published_at,
+               observed_at, ingested_at, source_game_kickoff, market_quote_at,
+               season_complete_at, payload_sha256
+        FROM pit_snapshot_inputs
+        WHERE snapshot_id = ?
+        ORDER BY input_kind, source_table, input_id
+        """,
+        (manifest.snapshot_id,),
+    ).fetchall()
+    expected_inputs = [
+        _input_row_values(manifest.snapshot_id, input_ref)
+        for input_ref in manifest.inputs
+    ]
+    if [tuple(row) for row in stored_inputs] != expected_inputs:
+        raise PITSnapshotConflictError(
+            f"stored PIT snapshot {manifest.snapshot_id!r} has conflicting inputs"
+        )
+
+
 def record_snapshot(
     connection: sqlite3.Connection,
     manifest: PITSnapshotManifest,
 ) -> None:
-    """Persist a validated manifest idempotently without mutating existing history."""
+    """Persist a validated, sealed manifest idempotently and atomically."""
 
-    values = _snapshot_row_values(manifest)
     existing = connection.execute(
         """
         SELECT snapshot_id, game_id, prediction_time, kickoff, horizon,
@@ -159,71 +203,58 @@ def record_snapshot(
         (manifest.snapshot_id,),
     ).fetchone()
     if existing is not None:
-        if tuple(existing) != values:
-            raise PITSnapshotConflictError(
-                f"stored PIT snapshot {manifest.snapshot_id!r} conflicts with manifest"
-            )
-        stored_inputs = connection.execute(
-            """
-            SELECT snapshot_id, input_kind, input_id, source_table, evidence_id,
-                   subject_game_id, available_at, availability_method,
-                   availability_confidence, effective_at, published_at,
-                   observed_at, ingested_at, source_game_kickoff, market_quote_at,
-                   season_complete_at, payload_sha256
-            FROM pit_snapshot_inputs
-            WHERE snapshot_id = ?
-            ORDER BY input_kind, source_table, input_id
-            """,
-            (manifest.snapshot_id,),
-        ).fetchall()
-        expected_inputs = [
-            _input_row_values(manifest.snapshot_id, input_ref)
-            for input_ref in manifest.inputs
-        ]
-        if [tuple(row) for row in stored_inputs] != expected_inputs:
-            raise PITSnapshotConflictError(
-                f"stored PIT snapshot {manifest.snapshot_id!r} has conflicting inputs"
-            )
+        _verify_existing_snapshot(connection, manifest, existing)
         return
 
-    connection.execute(
-        """
-        INSERT INTO pit_snapshots(
-            snapshot_id,
-            game_id,
-            prediction_time,
-            kickoff,
-            horizon,
-            policy_version,
-            manifest_sha256
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
-        """,
-        values,
-    )
-    connection.executemany(
-        """
-        INSERT INTO pit_snapshot_inputs(
-            snapshot_id,
-            input_kind,
-            input_id,
-            source_table,
-            evidence_id,
-            subject_game_id,
-            available_at,
-            availability_method,
-            availability_confidence,
-            effective_at,
-            published_at,
-            observed_at,
-            ingested_at,
-            source_game_kickoff,
-            market_quote_at,
-            season_complete_at,
-            payload_sha256
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        [
-            _input_row_values(manifest.snapshot_id, input_ref)
-            for input_ref in manifest.inputs
-        ],
-    )
+    connection.execute("SAVEPOINT record_pit_snapshot")
+    try:
+        connection.execute(
+            """
+            INSERT INTO pit_snapshots(
+                snapshot_id,
+                game_id,
+                prediction_time,
+                kickoff,
+                horizon,
+                policy_version,
+                manifest_sha256
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            _snapshot_row_values(manifest),
+        )
+        connection.executemany(
+            """
+            INSERT INTO pit_snapshot_inputs(
+                snapshot_id,
+                input_kind,
+                input_id,
+                source_table,
+                evidence_id,
+                subject_game_id,
+                available_at,
+                availability_method,
+                availability_confidence,
+                effective_at,
+                published_at,
+                observed_at,
+                ingested_at,
+                source_game_kickoff,
+                market_quote_at,
+                season_complete_at,
+                payload_sha256
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                _input_row_values(manifest.snapshot_id, input_ref)
+                for input_ref in manifest.inputs
+            ],
+        )
+        connection.execute(
+            "INSERT INTO pit_snapshot_seals(snapshot_id) VALUES (?)",
+            (manifest.snapshot_id,),
+        )
+        connection.execute("RELEASE SAVEPOINT record_pit_snapshot")
+    except BaseException:
+        connection.execute("ROLLBACK TO SAVEPOINT record_pit_snapshot")
+        connection.execute("RELEASE SAVEPOINT record_pit_snapshot")
+        raise
