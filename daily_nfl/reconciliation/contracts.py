@@ -140,7 +140,10 @@ class ReconciliationEvidence:
         ):
             if not value.strip():
                 raise ValueError(f"{label} cannot be blank")
-        if self.evidence_observation_id is not None and not self.evidence_observation_id.strip():
+        if (
+            self.evidence_observation_id is not None
+            and not self.evidence_observation_id.strip()
+        ):
             raise ValueError("evidence_observation_id cannot be blank when present")
         _validate_facts(self.facts)
 
