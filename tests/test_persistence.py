@@ -264,7 +264,11 @@ def test_game_results_preserve_observations_canonical_revisions_and_sources(
         ).fetchone()
         source_count = connection.execute("SELECT COUNT(*) FROM game_result_sources").fetchone()
         current = connection.execute(
-            "SELECT revision, home_points_final, final_at FROM current_game_results WHERE game_id = ?",
+            """
+            SELECT revision, home_points_final, final_at
+            FROM current_game_results
+            WHERE game_id = ?
+            """,
             ("game-1",),
         ).fetchone()
 
