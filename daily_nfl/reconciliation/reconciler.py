@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from daily_nfl.domain import FranchiseId, PersonId
+from daily_nfl.reconciliation.authorities import GSIS_AUTHORITY_PROVIDER_ID
 from daily_nfl.reconciliation.canonical import (
     new_person_id,
     new_reconciliation_decision_id,
@@ -104,13 +105,12 @@ class IdentityReconciler:
     def resolve_or_create_gsis_player(
         self,
         *,
-        provider_id: str,
         gsis_id: str,
         canonical_name: str | None = None,
         valid_at: datetime | None = None,
     ) -> ReconciliationDecision:
         external = ExternalIdentity(
-            provider_id=provider_id,
+            provider_id=GSIS_AUTHORITY_PROVIDER_ID,
             provider_entity_type=GSIS_PLAYER_ENTITY_TYPE,
             external_id=gsis_id,
             valid_at=valid_at,
