@@ -28,6 +28,7 @@ from daily_nfl.reconciliation import (
     play_event_id_for,
     play_id_for,
     possession_id_for,
+    possession_segment_id_for,
 )
 
 
@@ -236,7 +237,10 @@ def normalize_nflverse_play(
         away_score=record.away_score_before,
         home_timeouts_remaining=record.home_timeouts_remaining,
         away_timeouts_remaining=record.away_timeouts_remaining,
-        possession_segment_id=possession.possession_id,
+        possession_segment_id=possession_segment_id_for(
+            context.game_id,
+            possession_sequence,
+        ),
     )
 
     play_type = classify_play_type(record)
