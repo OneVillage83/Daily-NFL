@@ -107,6 +107,9 @@ class PITPolicy:
             raise ValueError("PIT policy version cannot be blank")
 
 
+DEFAULT_PIT_POLICY = PITPolicy()
+
+
 @dataclass(frozen=True, slots=True)
 class PITInputRef:
     input_kind: PITInputKind
