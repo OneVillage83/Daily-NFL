@@ -62,7 +62,9 @@ def _require_aware(value: datetime | None, label: str) -> None:
 
 
 def _is_sha256(value: str) -> bool:
-    return len(value) == 64 and all(character in "0123456789abcdefABCDEF" for character in value)
+    return len(value) == 64 and all(
+        character in "0123456789abcdefABCDEF" for character in value
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -134,11 +136,11 @@ class PITInputRef:
     payload_sha256: str | None = None
 
     def __post_init__(self) -> None:
-        for value, label in (
+        for text_value, label in (
             (self.input_id, "input_id"),
             (self.source_table, "source_table"),
         ):
-            if not value.strip():
+            if not text_value.strip():
                 raise ValueError(f"{label} cannot be blank")
         if self.evidence_id is not None and not self.evidence_id.strip():
             raise ValueError("evidence_id cannot be blank when present")
@@ -146,7 +148,7 @@ class PITInputRef:
             raise ValueError("subject_game_id cannot be blank when present")
         if self.payload_sha256 is not None and not _is_sha256(self.payload_sha256):
             raise ValueError("payload_sha256 must be a SHA-256 hex digest")
-        for value, label in (
+        for timestamp, label in (
             (self.available_at, "available_at"),
             (self.effective_at, "effective_at"),
             (self.published_at, "published_at"),
@@ -156,7 +158,7 @@ class PITInputRef:
             (self.market_quote_at, "market_quote_at"),
             (self.season_complete_at, "season_complete_at"),
         ):
-            _require_aware(value, label)
+            _require_aware(timestamp, label)
 
 
 @dataclass(frozen=True, slots=True)
