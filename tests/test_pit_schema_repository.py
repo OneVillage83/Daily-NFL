@@ -130,7 +130,11 @@ def test_version_two_database_migrates_to_pit_schema(tmp_path: Path) -> None:
             ).fetchall()
         }
 
-    assert {"pit_snapshots", "pit_snapshot_inputs"}.issubset(tables)
+    assert {
+        "pit_snapshots",
+        "pit_snapshot_inputs",
+        "pit_snapshot_seals",
+    }.issubset(tables)
 
 
 def test_schedule_as_of_switches_only_after_revision_available_at(tmp_path: Path) -> None:
