@@ -39,6 +39,25 @@ class PointInTimeFidelity(StrEnum):
     UNKNOWN = "UNKNOWN"
 
 
+class HistoricalAvailability(StrEnum):
+    """Machine-readable description of historical dataset availability."""
+
+    ARCHIVAL = "ARCHIVAL"
+    PARTIAL_ARCHIVE = "PARTIAL_ARCHIVE"
+    CURRENT_ONLY = "CURRENT_ONLY"
+    UNKNOWN = "UNKNOWN"
+
+
+class ReliabilityTier(StrEnum):
+    """Operational source-reliability classification, independent of source tier."""
+
+    TIER_1 = "TIER_1"
+    TIER_2 = "TIER_2"
+    TIER_3 = "TIER_3"
+    EXPERIMENTAL = "EXPERIMENTAL"
+    UNKNOWN = "UNKNOWN"
+
+
 class CostClass(StrEnum):
     FREE = "FREE"
     PAID = "PAID"
@@ -46,8 +65,17 @@ class CostClass(StrEnum):
     UNKNOWN = "UNKNOWN"
 
 
+def _validate_string_tuple(values: tuple[str, ...], label: str) -> None:
+    if any(not value.strip() for value in values):
+        raise ValueError(f"{label} cannot contain blanks")
+    if len(values) != len(set(values)):
+        raise ValueError(f"{label} cannot contain duplicates")
+
+
 @dataclass(frozen=True, slots=True)
 class ProviderCapability:
+    """Machine-readable F-2.2 metadata for one provider/dataset capability."""
+
     dataset: DatasetKind
     point_in_time_fidelity: PointInTimeFidelity
     cadence: str
@@ -56,6 +84,16 @@ class ProviderCapability:
     earliest_season: int | None = None
     latest_season: int | None = None
     reliability_note: str | None = None
+    entity_coverage: tuple[str, ...] = ()
+    field_coverage: tuple[str, ...] = ()
+    expected_latency: str | None = None
+    historical_availability: HistoricalAvailability = HistoricalAvailability.UNKNOWN
+    reliability_tier: ReliabilityTier = ReliabilityTier.UNKNOWN
+    schema_version: str | None = None
+    license_id: str | None = None
+    license_url: str | None = None
+    attribution_required: bool = False
+    attribution_text: str | None = None
 
     def __post_init__(self) -> None:
         if not self.cadence.strip():
@@ -72,6 +110,20 @@ class ProviderCapability:
             and self.latest_season < self.earliest_season
         ):
             raise ValueError("latest_season cannot precede earliest_season")
+        _validate_string_tuple(self.entity_coverage, "entity_coverage")
+        _validate_string_tuple(self.field_coverage, "field_coverage")
+        for value, label in (
+            (self.reliability_note, "reliability_note"),
+            (self.expected_latency, "expected_latency"),
+            (self.schema_version, "schema_version"),
+            (self.license_id, "license_id"),
+            (self.license_url, "license_url"),
+            (self.attribution_text, "attribution_text"),
+        ):
+            if value is not None and not value.strip():
+                raise ValueError(f"{label} cannot be blank when present")
+        if self.attribution_required and self.attribution_text is None:
+            raise ValueError("attribution_text is required when attribution is required")
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,6 +144,8 @@ class ProviderDescriptor:
         ):
             if not value.strip():
                 raise ValueError(f"{label} cannot be blank")
+        if self.provider_schema_version is not None and not self.provider_schema_version.strip():
+            raise ValueError("provider_schema_version cannot be blank when present")
         datasets = [capability.dataset for capability in self.capabilities]
         if len(datasets) != len(set(datasets)):
             raise ValueError("provider capabilities cannot repeat a dataset")
@@ -141,6 +195,10 @@ class ProviderPayload:
             raise ValueError("provider payload cannot be empty")
         if not self.content_type.strip():
             raise ValueError("content_type cannot be blank")
+        if self.source_uri is not None and not self.source_uri.strip():
+            raise ValueError("source_uri cannot be blank when present")
+        if self.provider_schema_version is not None and not self.provider_schema_version.strip():
+            raise ValueError("provider_schema_version cannot be blank when present")
         for value, label in (
             (self.observed_at, "observed_at"),
             (self.available_at, "available_at"),
@@ -164,8 +222,26 @@ class ProviderAdapter(Protocol):
 
 
 @dataclass(frozen=True, slots=True)
+class NormalizedRecordProvenance:
+    """Record-level lineage into immutable raw content and its acquisition event."""
+
+    source_record_id: str
+    evidence_id: str
+    evidence_observation_id: str
+
+    def __post_init__(self) -> None:
+        for value, label in (
+            (self.source_record_id, "source_record_id"),
+            (self.evidence_id, "evidence_id"),
+            (self.evidence_observation_id, "evidence_observation_id"),
+        ):
+            if not value.strip():
+                raise ValueError(f"{label} cannot be blank")
+
+
+@dataclass(frozen=True, slots=True)
 class NormalizedAcquisition[NormalizedT]:
-    """Typed normalized records linked back to every contributing raw asset."""
+    """Typed normalized records with record-level raw-evidence lineage."""
 
     provider_id: str
     dataset: DatasetKind
@@ -173,6 +249,7 @@ class NormalizedAcquisition[NormalizedT]:
     provider_schema_version: str | None
     evidence_ids: tuple[str, ...]
     records: tuple[NormalizedT, ...]
+    record_provenance: tuple[NormalizedRecordProvenance, ...] = ()
 
     def __post_init__(self) -> None:
         for value, label in (
@@ -181,9 +258,16 @@ class NormalizedAcquisition[NormalizedT]:
         ):
             if not value.strip():
                 raise ValueError(f"{label} cannot be blank")
+        if self.provider_schema_version is not None and not self.provider_schema_version.strip():
+            raise ValueError("provider_schema_version cannot be blank when present")
         if not self.evidence_ids:
             raise ValueError("normalized acquisition requires at least one evidence_id")
         if any(not evidence_id.strip() for evidence_id in self.evidence_ids):
             raise ValueError("evidence_ids cannot contain blanks")
         if len(self.evidence_ids) != len(set(self.evidence_ids)):
             raise ValueError("evidence_ids cannot contain duplicates")
+        if len(self.record_provenance) != len(self.records):
+            raise ValueError("every normalized record requires record-level provenance")
+        evidence_set = set(self.evidence_ids)
+        if any(item.evidence_id not in evidence_set for item in self.record_provenance):
+            raise ValueError("record provenance must reference acquisition evidence_ids")
