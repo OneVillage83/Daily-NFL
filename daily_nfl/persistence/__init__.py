@@ -8,11 +8,11 @@ from daily_nfl.persistence.database import (
     open_database,
 )
 from daily_nfl.persistence.migrations import (
+    SCHEMA_VERSION,
     SchemaVersionError,
     apply_migrations,
     current_schema_version,
 )
-from daily_nfl.persistence.schema import SCHEMA_VERSION
 
 __all__ = [
     "DatabaseStatus",
