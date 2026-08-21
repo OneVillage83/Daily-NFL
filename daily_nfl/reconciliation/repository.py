@@ -278,7 +278,10 @@ class IdentityRepository:
                 supersedes_crosswalk_id,
             ),
         )
-        crosswalk_id = int(cursor.lastrowid)
+        lastrowid = cursor.lastrowid
+        if lastrowid is None:
+            raise RuntimeError("inserted crosswalk did not return a row id")
+        crosswalk_id = int(lastrowid)
         binding = self.crosswalk_by_id(crosswalk_id)
         if binding is None:
             raise RuntimeError("inserted crosswalk could not be reloaded")
