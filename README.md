@@ -7,8 +7,9 @@ Daily NFL is the NFL modeling engine for **The Daily Line**. Its governing archi
 - F-0 through F-24 architecture: complete and versioned
 - M0 Repository Bootstrap / Engineering Constitution: **ARCHITECTURE-CERTIFIED**
 - M1 Canonical Domain Contracts: **ARCHITECTURE-CERTIFIED**
-- M2 through M6: provisionally implemented; each milestone must be architecture-certified in order before later work is treated as closed
-- Next formal certification target: **M2 — Persistence & Migration Foundation**, audited against F-2, F-3, F-4, and F-5
+- M2 Persistence & Migration Foundation: architecture-conformance audit/remediation complete in code; local quality and SQLite certification gates pending
+- M3 through M6: provisionally implemented; each milestone must be architecture-certified in order before later work is treated as closed
+- Current M2 audit authority: `docs/implementation/M2_ARCHITECTURE_CONFORMANCE_AUDIT.md`
 
 The current certification authority is `docs/implementation/ARCHITECTURE_CERTIFICATION_LOG.md`. The older `PROJECT_CHECKPOINT_LOG.md` remains a historical implementation snapshot from before the formal certification sequence and is not allowed to override newer certification status.
 
@@ -104,3 +105,7 @@ M1 certification evidence:
 
 - `docs/implementation/M1_ARCHITECTURE_CONFORMANCE_AUDIT.md`
 - `docs/implementation/M1_LOCAL_VALIDATION_20260821.md`
+
+M2 conformance audit:
+
+- `docs/implementation/M2_ARCHITECTURE_CONFORMANCE_AUDIT.md`
