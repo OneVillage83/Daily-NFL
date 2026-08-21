@@ -5,6 +5,7 @@ from uuid import UUID
 
 import pytest
 
+from daily_nfl.domain import AvailabilityConfidence, AvailabilityMethod
 from daily_nfl.persistence import apply_migrations, open_database
 from daily_nfl.pit import (
     PITHorizon,
@@ -14,7 +15,6 @@ from daily_nfl.pit import (
     build_snapshot_manifest,
     record_snapshot,
 )
-from daily_nfl.domain import AvailabilityConfidence, AvailabilityMethod
 from daily_nfl.reconciliation import (
     IdentityRepository,
     game_id_for_event,
@@ -22,6 +22,11 @@ from daily_nfl.reconciliation import (
     new_franchise_id,
     team_season_id_for,
 )
+
+
+def _fixture_game_id():
+    event_id = new_event_id(UUID("33333333-3333-3333-3333-333333333333"))
+    return game_id_for_event(event_id)
 
 
 def _insert_game(connection: sqlite3.Connection) -> tuple[str, PredictionCutoff]:
@@ -89,7 +94,7 @@ def _input(input_id: str, cutoff: PredictionCutoff, payload: str) -> PITInputRef
 def test_snapshot_identity_is_deterministic_and_input_order_independent() -> None:
     kickoff = datetime(2026, 9, 10, 20, 20, tzinfo=UTC)
     cutoff = PredictionCutoff.from_horizon(
-        game_id=game_id_for_event(new_event_id(UUID("33333333-3333-3333-3333-333333333333"))),
+        game_id=_fixture_game_id(),
         kickoff=kickoff,
         horizon=PITHorizon.T_90M,
     )
@@ -107,7 +112,7 @@ def test_snapshot_identity_is_deterministic_and_input_order_independent() -> Non
 def test_changing_one_input_changes_snapshot_identity() -> None:
     kickoff = datetime(2026, 9, 10, 20, 20, tzinfo=UTC)
     cutoff = PredictionCutoff.from_horizon(
-        game_id=game_id_for_event(new_event_id(UUID("33333333-3333-3333-3333-333333333333"))),
+        game_id=_fixture_game_id(),
         kickoff=kickoff,
         horizon=PITHorizon.T_90M,
     )
