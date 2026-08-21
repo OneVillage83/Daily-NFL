@@ -3,6 +3,8 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import UUID
 
+import pytest
+
 from daily_nfl.domain import AvailabilityConfidence, AvailabilityMethod, GameId
 from daily_nfl.persistence import SCHEMA_VERSION, apply_migrations, open_database
 from daily_nfl.persistence.identity_schema import IDENTITY_RECONCILIATION_SCHEMA_SQL
@@ -120,7 +122,7 @@ def test_version_two_database_migrates_to_pit_schema(tmp_path: Path) -> None:
         )
         connection.commit()
 
-        assert apply_migrations(connection) == SCHEMA_VERSION == 3
+        assert apply_migrations(connection) == SCHEMA_VERSION
         tables = {
             str(row[0])
             for row in connection.execute(
@@ -201,9 +203,5 @@ def test_schedule_query_rejects_mismatched_cutoff_game(tmp_path: Path) -> None:
             prediction_time=kickoff - timedelta(hours=2),
         )
 
-        try:
+        with pytest.raises(ValueError, match="must match"):
             schedule_state_as_of(connection, game_id=game_id, cutoff=cutoff)
-        except ValueError as exc:
-            assert "must match" in str(exc)
-        else:
-            raise AssertionError("mismatched game identity should fail closed")
