@@ -1,4 +1,6 @@
 import sqlite3
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import UUID
@@ -20,11 +22,12 @@ from daily_nfl.reconciliation import (
 )
 
 
-def _open_identity_database(path: Path) -> sqlite3.Connection:
-    connection = open_database(path)
-    apply_migrations(connection)
-    record_provider(connection, NFLVERSE_DESCRIPTOR)
-    return connection
+@contextmanager
+def _open_identity_database(path: Path) -> Iterator[sqlite3.Connection]:
+    with open_database(path) as connection:
+        apply_migrations(connection)
+        record_provider(connection, NFLVERSE_DESCRIPTOR)
+        yield connection
 
 
 def _insert_fixture_game(
