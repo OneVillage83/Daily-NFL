@@ -3,170 +3,165 @@
 **Project:** The Daily Line — Daily NFL  
 **Milestone:** M0 — Repository Bootstrap & Engineering Constitution  
 **Branch:** `audit/m0-architecture-conformance`  
-**Purpose:** Preserve the local validation evidence used by the M0 architecture-conformance audit.
+**Final result:** **PASS — used for M0 architecture certification**
 
 ---
 
 ## 1. Environment
 
-Observed local interpreter:
+Final certification interpreter:
 
 ```text
 Python 3.12.10
 ```
 
-Initial project compiler/dependency inputs expected:
+Validated lock-compiler toolchain:
 
 ```text
 pip==26.1.2
 pip-tools==7.6.0
-nflreadpy==0.1.5
 ```
 
----
-
-## 2. Preliminary dependency resolution
-
-Before switching to the audit branch, `requirements-dev.txt` was regenerated without the M0-required hash-generation flags:
-
-```powershell
-python -m piptools compile `
-  --resolver=backtracking `
-  --output-file=requirements-dev.txt `
-  requirements-dev.in
-```
-
-This successfully resolved:
+Required M6B development dependency:
 
 ```text
 nflreadpy==0.1.5
-polars==1.43.2
-polars-runtime-32==1.43.2
-pydantic-settings==2.15.0
-requests==2.34.2
-...
 ```
-
-`Select-String` confirmed `nflreadpy==0.1.5` was present in the generated file.
-
-This proved that the dependency input itself resolves successfully, but the resulting file is **not an acceptable M0 production lock** because it was generated without `--generate-hashes`, `--strip-extras`, and `--allow-unsafe`.
 
 ---
 
-## 3. Preliminary code quality gate
+## 2. Preliminary discovery and failed compiler attempt
 
-Using that resolved environment, the local quality gate passed:
+An initial dependency-resolution run without hash-generation flags successfully resolved `nflreadpy==0.1.5` and its transitive dependencies. That established that the dependency input itself was valid, but the generated file was not acceptable as the project lock because hashes were omitted.
 
-```text
-pytest: 105 passed
-Ruff: All checks passed!
-mypy: Success: no issues found in 66 source files
-```
-
-This is positive code-quality evidence, but it does not by itself close the M0 reproducibility gate because the environment was not rebuilt from a valid hashed lock.
-
----
-
-## 4. Audit-branch lock regeneration attempt
-
-After switching to:
+A subsequent attempt upgraded pip without a version pin:
 
 ```text
-audit/m0-architecture-conformance
+pip 26.1.2 -> 26.2.1
 ```
 
-the interpreter was confirmed as:
-
-```text
-Python 3.12.10
-```
-
-The command sequence then performed an unpinned pip upgrade:
-
-```powershell
-python -m pip install --upgrade pip
-```
-
-which changed pip from:
-
-```text
-26.1.2
-```
-
-to:
-
-```text
-26.2.1
-```
-
-`pip-tools==7.6.0` remained installed.
-
-The required hashed compile then failed before dependency resolution with:
+With `pip-tools==7.6.0`, lock compilation then failed with:
 
 ```text
 ImportError: cannot import name 'stdlib_pkgs' from 'pip._internal.utils.compat'
 ```
 
-This failure is a compiler-toolchain compatibility problem, not a Daily NFL application/test failure.
+This was diagnosed as a lock-compiler toolchain incompatibility rather than a Daily NFL application failure.
 
-`pip-tools==7.6.0` imports pip internal APIs and is not compatible with the upgraded `pip==26.2.1` environment used in this attempt.
+M0 remediation:
 
----
-
-## 5. Important audit finding
-
-The local validation exposed a second reproducibility issue in the previous README bootstrap instructions:
-
-```text
-python -m pip install --upgrade pip
-```
-
-was unsafe because it allowed the lock compiler's pip dependency to float beyond the tested/pinned compiler pair.
-
-The M0 audit branch therefore changed the bootstrap policy to use the explicit compiler toolchain:
-
-```text
-pip==26.1.2
-pip-tools==7.6.0
-```
-
-and forbids an unpinned pip upgrade before lock compilation.
+- remove the unsafe unpinned pip-upgrade instruction;
+- explicitly use the validated pair `pip==26.1.2` / `pip-tools==7.6.0` for lock compilation;
+- document the lock-toolchain rule in README and `AGENTS.md`.
 
 ---
 
-## 6. Evidence that application dependencies are otherwise healthy
+## 3. Final hashed dependency lock
 
-Even after the failed hashed compile, the already generated non-hashed dependency set was installed/available and the following checks succeeded:
+`requirements-dev.txt` was regenerated with the required reproducibility flags under Python 3.12:
+
+```text
+--generate-hashes
+--strip-extras
+--allow-unsafe
+```
+
+The resulting lock preserves the prior dependency set and adds the missing nflreadpy graph.
+
+Observed diff summary:
+
+```text
+requirements-dev.txt | 229 +++++++++++++++++++++++++++++++++++++++++++++++++++
+1 file changed, 229 insertions(+)
+```
+
+No existing lock entries were deleted.
+
+The committed lock now includes:
+
+```text
+nflreadpy==0.1.5
+```
+
+with generated SHA-256 hashes, plus required dependencies including the resolved Polars, requests, pydantic-settings, platformdirs, and related packages.
+
+Committed as:
+
+```text
+173f5a117325bb248a5ecc174ec27b6e3859447f
+build: refresh hashed dev dependency lock
+```
+
+---
+
+## 4. Fresh-environment certification run
+
+A new ignored Python 3.12 virtual environment was used:
+
+```text
+local-data/m0-cert-venv
+```
+
+The fresh environment successfully imported both the project package and the provider dependency:
 
 ```text
 daily_nfl 0.1.0
 nflreadpy import OK
-pytest: 105 passed
-Ruff: All checks passed!
-mypy: Success: no issues found in 66 source files
 ```
 
-Again, this validates the application code/dependency resolution but does **not** substitute for a clean install from the final hashed lock.
+### pytest
+
+```text
+105 passed in 1.14s
+```
+
+### Ruff
+
+```text
+All checks passed!
+```
+
+### mypy
+
+```text
+Success: no issues found in 66 source files
+```
+
+The working-tree state after regeneration showed only the intended generated lock change before commit:
+
+```text
+M requirements-dev.txt
+```
 
 ---
 
-## 7. Current certification state
+## 5. Certification conclusion
+
+All M0 environment/reproducibility gates are satisfied:
 
 ```text
-M0 LOCAL CODE QUALITY GATE: PASS
-M0 DEPENDENCY RESOLUTION: PASS
-M0 HASHED LOCK REPRODUCIBILITY: NOT YET CLOSED
-M0 ARCHITECTURE CERTIFICATION: WITHHELD
+Python 3.12 baseline: PASS
+pinned compiler toolchain: PASS
+hashed dev lock generation: PASS
+nflreadpy==0.1.5 captured in lock: PASS
+fresh isolated environment: PASS
+Daily NFL import/version: PASS
+nflreadpy import: PASS
+pytest: PASS — 105 tests
+Ruff: PASS
+strict mypy: PASS — 66 source files
 ```
 
-Remaining certification work:
+Final result:
 
-1. restore/install `pip==26.1.2` with `pip-tools==7.6.0` under Python 3.12;
-2. regenerate `requirements-dev.txt` with `--generate-hashes --strip-extras --allow-unsafe`;
-3. confirm `nflreadpy==0.1.5` is present in the hashed lock;
-4. create a fresh ignored Python 3.12 virtual environment;
-5. install the hashed lock into that clean environment with `--require-hashes`;
-6. run package/nflreadpy import checks in that clean environment;
-7. run pytest, Ruff, and mypy using that clean environment;
-8. commit the refreshed lock to the audit branch;
-9. update the M0 conformance audit and project checkpoint with final certification evidence.
+```text
+M0 HASHED LOCK REPRODUCIBILITY: PASS
+M0 CLEAN-ENVIRONMENT QUALITY GATE: PASS
+M0 ARCHITECTURE CERTIFICATION: PASS
+```
+
+This evidence is incorporated into `M0_ARCHITECTURE_CONFORMANCE_AUDIT.md` and supports the formal status:
+
+```text
+M0 — ARCHITECTURE-CERTIFIED
+```
