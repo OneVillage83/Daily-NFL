@@ -21,9 +21,7 @@ RosterStintId = NewType("RosterStintId", str)
 CoachRoleId = NewType("CoachRoleId", str)
 VenueId = NewType("VenueId", str)
 PossessionId = NewType("PossessionId", str)
-# F-5 calls this ledger concept a possession segment. Keep PossessionId as the
-# established compatibility name while exposing the architecture-native alias.
-PossessionSegmentId = PossessionId
+PossessionSegmentId = NewType("PossessionSegmentId", str)
 DriveId = NewType("DriveId", str)
 PlayId = NewType("PlayId", str)
 PlayEventId = NewType("PlayEventId", str)
