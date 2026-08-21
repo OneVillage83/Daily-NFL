@@ -6,8 +6,8 @@ import pytest
 from daily_nfl.domain import (
     AvailabilityConfidence,
     AvailabilityMethod,
-    CoachRoleId,
     CoachingRole,
+    CoachRoleId,
     CompetitionId,
     Drive,
     DriveId,
