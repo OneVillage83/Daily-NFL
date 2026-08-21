@@ -93,6 +93,20 @@ BEGIN
     SELECT RAISE(ABORT, 'games require canonical competition_id');
 END;
 
+CREATE TRIGGER drives_require_segment_insert
+BEFORE INSERT ON drives
+WHEN NEW.possession_segment_id IS NULL OR trim(NEW.possession_segment_id) = ''
+BEGIN
+    SELECT RAISE(ABORT, 'drives require possession_segment_id');
+END;
+
+CREATE TRIGGER plays_require_segment_insert
+BEFORE INSERT ON plays
+WHEN NEW.possession_segment_id IS NULL OR trim(NEW.possession_segment_id) = ''
+BEGIN
+    SELECT RAISE(ABORT, 'plays require possession_segment_id');
+END;
+
 CREATE TRIGGER participation_observations_require_identity
 BEFORE INSERT ON participation_observations
 WHEN NEW.participation_id IS NULL OR trim(NEW.participation_id) = ''
