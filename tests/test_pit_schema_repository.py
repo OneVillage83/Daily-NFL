@@ -86,7 +86,6 @@ def _insert_schedule_observation(
     available_at: datetime,
     provider_revision: str,
     provider_id: str = "nflverse",
-    actual_kickoff: datetime | None = None,
     neutral_site: bool | None = None,
     schedule_version: str | None = None,
 ) -> None:
@@ -99,7 +98,6 @@ def _insert_schedule_observation(
             provider_game_id,
             status,
             scheduled_kickoff,
-            actual_kickoff,
             neutral_site,
             schedule_version,
             observed_at,
@@ -108,7 +106,7 @@ def _insert_schedule_observation(
             availability_method,
             availability_confidence,
             provider_revision
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             observation_id,
@@ -117,7 +115,6 @@ def _insert_schedule_observation(
             "fixture-game",
             status,
             kickoff.isoformat(),
-            actual_kickoff.isoformat() if actual_kickoff is not None else None,
             int(neutral_site) if neutral_site is not None else None,
             schedule_version,
             available_at.isoformat(),
@@ -252,7 +249,7 @@ def test_schedule_as_of_switches_only_after_revision_available_at(tmp_path: Path
     assert later.provider_revision == "v2"
 
 
-def test_schedule_as_of_preserves_actual_kickoff_and_all_supporting_sources(
+def test_schedule_as_of_preserves_pregame_fields_and_all_supporting_sources(
     tmp_path: Path,
 ) -> None:
     database = tmp_path / "pit.db"
@@ -275,7 +272,6 @@ def test_schedule_as_of_preserves_actual_kickoff_and_all_supporting_sources(
                 game_id=game_id,
                 status="SCHEDULED",
                 kickoff=kickoff,
-                actual_kickoff=kickoff,
                 available_at=available,
                 provider_revision="r1",
                 provider_id=provider_id,
@@ -286,7 +282,6 @@ def test_schedule_as_of_preserves_actual_kickoff_and_all_supporting_sources(
         state = schedule_state_as_of(connection, game_id=game_id, cutoff=cutoff)
 
     assert state is not None
-    assert state.actual_kickoff == kickoff
     assert state.neutral_site is True
     assert state.schedule_version == "schedule-v1"
     assert len(state.supporting_inputs) == 2
