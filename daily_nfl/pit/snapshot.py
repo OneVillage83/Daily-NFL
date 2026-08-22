@@ -260,12 +260,7 @@ def _validate_retrospective_kickoff_boundary(
     if not actual_kickoffs:
         return
     actual_kickoff = next(iter(actual_kickoffs))
-    cutoff_kickoff = manifest.cutoff.kickoff.astimezone(UTC)
     prediction_time = manifest.cutoff.prediction_time.astimezone(UTC)
-    if cutoff_kickoff != actual_kickoff:
-        raise PITSnapshotConflictError(
-            "historical PIT cutoff kickoff must match retrospective actual_kickoff truth"
-        )
     if prediction_time >= actual_kickoff:
         raise PITSnapshotConflictError(
             "pregame PIT prediction_time cannot be at or after actual kickoff"
