@@ -6,7 +6,8 @@
 **Audit branch:** `audit/m4-architecture-conformance`  
 **Certified base:** M3 merge `a4804645dd43a708197af625c8fb2a0fca220c09`  
 **Architecture dependency:** F-3 — Canonical Identity & Reconciliation  
-**Certification status:** **NOT YET CERTIFIED — STATIC AUDIT / REMEDIATION IMPLEMENTED; LOCAL AND REAL-PROVIDER GATES PENDING**
+**Validated executable code head:** `c15ef10df3e0f2eae393e0dc0c3c586b0d9f0505`  
+**Certification status:** **ARCHITECTURE-CERTIFIED**
 
 ---
 
@@ -94,10 +95,10 @@ Local validation requires a small provider sample. Historical as-of availability
 | M4-26 | Reconciliation evidence history is append-only | `SATISFIED AFTER REMEDIATION` | Migration v6 adds update/delete rejection triggers. |
 | M4-27 | Verification/confidence/method change cannot be silently collapsed | `SATISFIED AFTER REMEDIATION` | Same target/interval with changed resolution metadata requires explicit supersession. |
 | M4-28 | Supersession preserves earlier historical mapping | `SATISFIED` | Existing supersedes relationship retained and index widened for explicit metadata revisions. |
-| M4-29 | Forward migration preserves M3/M4 provisional history | `STATIC TEST IMPLEMENTED; LOCAL GATE PENDING` | v5→v6 migration test retains legacy decision/crosswalk rows. |
-| M4-30 | M1/M2/M3 certified contracts remain intact | `STATIC REVIEW COMPLETE; LOCAL GATE PENDING` | Migration is additive/forward-only; no rewrite of migrations 1–5. |
-| M4-31 | Real small provider sample reaches canonical reconciliation | `LOCAL REAL-PROVIDER GATE PENDING` | `scripts/validate_m4_reconciliation.py`. |
-| M4-32 | Full repository quality gate | `LOCAL VALIDATION PENDING` | pytest / Ruff / strict mypy / clean tree required. |
+| M4-29 | Forward migration preserves M3/M4 provisional history | `VALIDATED` | v5→v6 migration coverage passes inside the 141-test exact-head suite; fresh 0→6 and 6→6 CLI gates also pass. |
+| M4-30 | M1/M2/M3 certified contracts remain intact | `VALIDATED` | Final exact-head quality gate passes: 141 pytest, Ruff, strict mypy; migration remains additive/forward-only with migrations 1–5 unchanged. |
+| M4-31 | Real small provider sample reaches canonical reconciliation | `VALIDATED` | Real nflverse record `2025_01_DAL_PHI` reaches opaque franchise and season-scoped TeamSeason reconciliation with raw/evidence-observation lineage. |
+| M4-32 | Full repository quality gate | `VALIDATED` | Python 3.12.10: 141 passed in 2.65s; Ruff PASS; strict mypy PASS on 76 source files; clean tree. |
 
 ---
 
@@ -169,7 +170,7 @@ This does **not** fabricate richer roster-stint, coaching, injury, or depth-char
 
 ## 6. Fail-closed rules after remediation
 
-M4 now intentionally refuses to guess in the following cases:
+M4 intentionally refuses to guess in the following cases:
 
 - fuzzy candidates cannot become crosswalks;
 - multiple canonical candidates remain `AMBIGUOUS`;
@@ -196,45 +197,70 @@ M4 now intentionally refuses to guess in the following cases:
 
 ---
 
-## 8. Required certification evidence
+## 8. Certification evidence
 
-Before M4 certification, the branch must produce:
+Final exact-head local evidence:
 
 ```text
-full pytest PASS
-Ruff PASS
-strict mypy PASS
-clean working tree
-schema version 6
-fresh SQLite migration/check PASS
-real nflverse schedule acquisition PASS
-stored raw SHA-256 parity PASS
-one real provider schedule source row inspected
-raw evidence + evidence-observation IDs carried into reconciliation evidence
-provider home-team code mapped to opaque canonical franchise identity
-same provider team code resolved to season-scoped canonical TeamSeason identity
-team-season crosswalk has explicit validity interval
-reconciliation decision evidence rows persisted
-provider-local play identity scoping tests PASS
+validated executable head: c15ef10df3e0f2eae393e0dc0c3c586b0d9f0505
+Python 3.12.10
+pytest: 141 passed in 2.65s
+Ruff: All checks passed!
+mypy: Success: no issues found in 76 source files
+git status --short: clean
 ```
 
-Operational commands are supplied directly in the certification thread.
+SQLite evidence:
+
+```text
+fresh DB: schema 0 -> 6
+foreign_keys_enabled: true
+integrity_ok: true
+mode: migrate
+
+check DB: schema 6 -> 6
+foreign_keys_enabled: true
+integrity_ok: true
+mode: check
+```
+
+Real nflverse reconciliation evidence:
+
+```text
+provider_id: nflverse
+season: 2025
+source_record_id: 2025_01_DAL_PHI
+schema_version: 6
+sha256 == stored_sha256: PASS
+franchise_status: RESOLVED
+team_season_status: RESOLVED
+team_season_match_method: CANONICAL_COMPOSITE
+reconciliation_evidence_rows: 2
+team_crosswalk_valid_from: 2025-03-01T00:00:00+00:00
+team_crosswalk_valid_to: 2026-02-28T23:59:59.999999+00:00
+```
+
+Detailed evidence is preserved in `docs/implementation/M4_LOCAL_VALIDATION_20260821.md`.
 
 ---
 
-## 9. Current decision
+## 9. Certification decision
 
 ```text
 M4 F-3 STATIC ARCHITECTURE AUDIT: COMPLETE
-M4 IDENTITY VOCABULARY REMEDIATION: IMPLEMENTED
-M4 RECONCILIATION EVIDENCE REMEDIATION: IMPLEMENTED
-M4 TEAM-SEASON VALIDITY REMEDIATION: IMPLEMENTED
-M4 PROVIDER-LOCAL ID SCOPING: IMPLEMENTED
-M4 DRIVE / PLAY RECONCILIATION: IMPLEMENTED
-M4 CROSSWALK VERSIONING / ATOMICITY: IMPLEMENTED
-M4 MIGRATION v6: IMPLEMENTED
-M4 LOCAL QUALITY GATE: PENDING
-M4 SQLITE v6 GATE: PENDING
-M4 REAL NFLVERSE RECONCILIATION GATE: PENDING
-M4 ARCHITECTURE CERTIFICATION: WITHHELD UNTIL ALL LOCAL GATES PASS
+M4 IDENTITY VOCABULARY REMEDIATION: VALIDATED
+M4 RECONCILIATION EVIDENCE REMEDIATION: VALIDATED
+M4 TEAM-SEASON VALIDITY REMEDIATION: VALIDATED
+M4 PROVIDER-LOCAL ID SCOPING: VALIDATED
+M4 DRIVE / PLAY RECONCILIATION: VALIDATED
+M4 CROSSWALK VERSIONING / ATOMICITY: VALIDATED
+M4 MIGRATION v6: VALIDATED
+M4 LOCAL QUALITY GATE: PASS
+M4 SQLITE v6 GATE: PASS
+M4 REAL NFLVERSE RECONCILIATION GATE: PASS
+M4 ARCHITECTURE CERTIFICATION: PASS
+
+M4 — ARCHITECTURE-CERTIFIED
 ```
+
+Documentation commits after `c15ef10df3e0f2eae393e0dc0c3c586b0d9f0505` record evidence/status only and do not change the executable behavior that was validated.
