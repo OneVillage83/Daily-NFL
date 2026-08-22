@@ -74,6 +74,10 @@ def _insert_m5_snapshot_row(
     game_id: str,
     input_count: int,
 ) -> None:
+    coverage = (
+        '{"coverage_fraction":1.0,"expected_feature_count":0,'
+        '"missing_feature_count":0,"present_feature_count":0}'
+    )
     connection.execute(
         """
         INSERT INTO pit_snapshots(
@@ -94,7 +98,7 @@ def _insert_m5_snapshot_row(
             "M5_FIXTURE_V1",
             "1",
             "{}",
-            '{"coverage_fraction":1.0,"expected_feature_count":0,"missing_feature_count":0,"present_feature_count":0}',
+            coverage,
             "[]",
             "PASS",
             input_count,
@@ -130,7 +134,7 @@ def test_v7_migration_preserves_legacy_v6_pit_snapshot(tmp_path: Path) -> None:
         )
         connection.commit()
 
-        assert apply_migrations(connection) == SCHEMA_VERSION == 7
+        assert apply_migrations(connection) == SCHEMA_VERSION
         legacy = connection.execute(
             """
             SELECT snapshot_id, feature_contract, pit_validation_result, input_count
