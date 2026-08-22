@@ -65,16 +65,25 @@ END;
 
 CREATE TRIGGER pit_snapshot_inputs_require_evidence_pair
 BEFORE INSERT ON pit_snapshot_inputs
-WHEN NEW.evidence_observation_id IS NOT NULL
- AND NOT EXISTS (
-    SELECT 1
-    FROM raw_evidence_observations observation
-    WHERE observation.evidence_observation_id = NEW.evidence_observation_id
-      AND (NEW.evidence_id IS NULL OR observation.evidence_id = NEW.evidence_id)
-      AND (NEW.provider_id IS NULL OR observation.provider_id = NEW.provider_id)
+WHEN (NEW.evidence_id IS NOT NULL OR NEW.evidence_observation_id IS NOT NULL)
+ AND (
+    NEW.evidence_id IS NULL
+    OR NEW.evidence_observation_id IS NULL
+    OR NEW.provider_id IS NULL
+    OR NEW.raw_sha256 IS NULL
+    OR NOT EXISTS (
+        SELECT 1
+        FROM raw_evidence_observations observation
+        JOIN raw_evidence raw
+          ON raw.evidence_id = observation.evidence_id
+        WHERE observation.evidence_observation_id = NEW.evidence_observation_id
+          AND observation.evidence_id = NEW.evidence_id
+          AND observation.provider_id = NEW.provider_id
+          AND raw.sha256 = NEW.raw_sha256
+    )
 )
 BEGIN
-    SELECT RAISE(ABORT, 'PIT input acquisition observation must match raw evidence/provider');
+    SELECT RAISE(ABORT, 'PIT input raw provenance must match evidence observation/provider/checksum');
 END;
 
 CREATE TRIGGER pit_snapshot_seals_require_validated_manifest
