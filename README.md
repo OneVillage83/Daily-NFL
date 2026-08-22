@@ -9,9 +9,10 @@ Daily NFL is the NFL modeling engine for **The Daily Line**. Its governing archi
 - M1 Canonical Domain Contracts: **ARCHITECTURE-CERTIFIED**
 - M2 Persistence & Migration Foundation: **ARCHITECTURE-CERTIFIED**
 - M3 Raw Evidence & Provider Abstraction: **ARCHITECTURE-CERTIFIED**
-- M4 Identity & Reconciliation Engine: F-3 static audit/remediation complete; local quality, SQLite, and real-provider certification gates pending
-- M5 through M6: provisionally implemented; each milestone must be architecture-certified in order before later work is treated as closed
-- Current M4 audit authority: `docs/implementation/M4_ARCHITECTURE_CONFORMANCE_AUDIT.md`
+- M4 Identity & Reconciliation Engine: **ARCHITECTURE-CERTIFIED**
+- M5 Historical PIT Engine: provisionally implemented; **next architecture-certification target**
+- M6 Canonical Play / Drive Normalization: provisionally implemented and must be architecture-certified after M5 before later work is treated as closed
+- M4 certification evidence: `docs/implementation/M4_ARCHITECTURE_CONFORMANCE_AUDIT.md` and `docs/implementation/M4_LOCAL_VALIDATION_20260821.md`
 
 The current certification authority is `docs/implementation/ARCHITECTURE_CERTIFICATION_LOG.md`. The older `PROJECT_CHECKPOINT_LOG.md` remains a historical implementation snapshot from before the formal certification sequence and is not allowed to override newer certification status.
 
@@ -118,6 +119,7 @@ M3 certification evidence:
 - `docs/implementation/M3_ARCHITECTURE_CONFORMANCE_AUDIT.md`
 - `docs/implementation/M3_LOCAL_VALIDATION_20260821.md`
 
-M4 conformance audit:
+M4 certification evidence:
 
 - `docs/implementation/M4_ARCHITECTURE_CONFORMANCE_AUDIT.md`
+- `docs/implementation/M4_LOCAL_VALIDATION_20260821.md`
