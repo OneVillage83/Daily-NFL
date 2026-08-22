@@ -140,7 +140,7 @@ def test_v7_migration_preserves_legacy_v6_pit_snapshot(tmp_path: Path) -> None:
             SELECT snapshot_id, feature_contract, pit_validation_result, input_count
             FROM pit_snapshots
             WHERE snapshot_id = 'pit_legacy'
-            """
+            """,
         ).fetchone()
 
     assert legacy is not None
@@ -168,9 +168,7 @@ def test_m5_snapshot_cannot_seal_until_declared_membership_is_complete(
             )
 
 
-def test_m5_snapshot_rejects_unknown_acquisition_observation_reference(
-    tmp_path: Path,
-) -> None:
+def test_m5_snapshot_rejects_incomplete_raw_provenance(tmp_path: Path) -> None:
     database = tmp_path / "pit.db"
 
     with open_database(database) as connection:
@@ -183,7 +181,7 @@ def test_m5_snapshot_rejects_unknown_acquisition_observation_reference(
             input_count=1,
         )
 
-        with pytest.raises(sqlite3.IntegrityError, match="must match raw evidence/provider"):
+        with pytest.raises(sqlite3.IntegrityError, match="raw provenance must match"):
             connection.execute(
                 """
                 INSERT INTO pit_snapshot_inputs(
