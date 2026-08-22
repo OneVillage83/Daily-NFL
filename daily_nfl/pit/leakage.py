@@ -151,6 +151,15 @@ def find_leakage(
                     )
                 )
 
+        if input_ref.input_kind is PITInputKind.FUTURE_SEASON_WEEK_LABEL:
+            violations.append(
+                PITLeakageViolation(
+                    code=PITLeakageCode.FUTURE_GAME_INFORMATION,
+                    input_id=input_ref.input_id,
+                    explanation="future season/week labels cannot enter a historical snapshot",
+                )
+            )
+
         if input_ref.input_kind is PITInputKind.SEASON_FINAL_AGGREGATE:
             if policy.require_context_metadata and input_ref.season_complete_at is None:
                 _append_missing_context(
