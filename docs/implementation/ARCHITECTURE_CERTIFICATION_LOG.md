@@ -38,8 +38,8 @@ M0  Repository Bootstrap / Engineering Constitution    ARCHITECTURE-CERTIFIED
 M1  Canonical Domain Contracts                         ARCHITECTURE-CERTIFIED
 M2  Persistence & Migration Foundation                 ARCHITECTURE-CERTIFIED
 M3  Raw Evidence & Provider Abstraction                ARCHITECTURE-CERTIFIED
-M4  Identity & Reconciliation Engine                   AUDIT/REMEDIATION COMPLETE — CERTIFICATION GATES PENDING
-M5  Historical PIT Engine                              PROVISIONAL
+M4  Identity & Reconciliation Engine                   ARCHITECTURE-CERTIFIED
+M5  Historical PIT Engine                              PROVISIONAL — AUDIT NEXT
 M6  Canonical Play / Drive Normalization               PROVISIONAL
 M6B Real nflverse PBP Validation                       COMPLETED IN SUBSTANCE / NOT A SUBSTITUTE FOR M6 CERTIFICATION
 M6C Controlled historical continuation                NOT STARTED
@@ -273,51 +273,94 @@ M3 — ARCHITECTURE-CERTIFIED
 
 ---
 
-## 2026-08-21 — M4 Audit / Remediation Complete
+## 2026-08-21 — M4 Certified
 
 **Milestone:** Identity & Reconciliation Engine  
 **Architecture:** F-3  
-**Certification:** WITHHELD pending executable gates
+**PR:** #6  
+**Validated executable code head:** `c15ef10df3e0f2eae393e0dc0c3c586b0d9f0505`
 
-Static remediation now includes:
+Material architecture corrections included:
 
-- reconciliation vocabulary aligned to the certified F-3 identity vocabulary;
-- missing opaque roster-stint / coach-role / injury-observation / depth-chart generators;
-- forward-only migration v6;
-- append-only reconciliation evidence linked to M3 raw evidence and acquisition observations;
-- database requirement that new crosswalks cite an existing reconciliation decision;
-- atomic decision/evidence/crosswalk persistence for resolved bindings;
+- reconciliation vocabulary aligned to the certified F-3/M1 identity vocabulary;
+- opaque roster-stint, coach-role, injury-observation, and depth-chart-snapshot identity generators;
+- forward-only migration v6 with migrations 1–5 preserved;
+- append-only reconciliation evidence linked to M3 raw content and acquisition observations;
+- structured source-record/matching facts retained for resolved and unresolved decisions;
+- database enforcement that new crosswalks cite an existing reconciliation decision;
+- atomic resolved decision/evidence/crosswalk persistence;
 - season-scoped TeamSeason crosswalk validity;
 - fail-closed handling of legacy timeless TeamSeason mappings used for the wrong season;
-- game existing-crosswalk context validation;
+- existing-game crosswalk context validation;
 - drive reconciliation by canonical game/sequence/context;
 - play reconciliation by canonical game/sequence/context;
-- explicit supersession requirement for changes in verification/method/confidence;
+- provider-local drive/play external IDs scoped by canonical game to prevent cross-game collisions;
+- explicit supersession for changes in verification/method/confidence;
+- direct database fuzzy-resolution rejection retained;
 - dedicated real nflverse schedule-row reconciliation validation.
+
+Final exact-head quality gate:
+
+```text
+Python 3.12.10
+pytest: 141 passed in 2.65s
+Ruff: All checks passed!
+mypy: Success: no issues found in 76 source files
+git status --short: clean
+```
+
+SQLite gate:
+
+```text
+fresh DB: schema 0 -> 6
+foreign_keys_enabled: true
+integrity_ok: true
+mode: migrate
+
+check DB: schema 6 -> 6
+foreign_keys_enabled: true
+integrity_ok: true
+mode: check
+```
+
+Real nflverse reconciliation gate:
+
+```text
+provider_id: nflverse
+season: 2025
+source_record_id: 2025_01_DAL_PHI
+schema_version: 6
+sha256 == stored_sha256: PASS
+franchise_status: RESOLVED
+team_season_status: RESOLVED
+team_season_match_method: CANONICAL_COMPOSITE
+reconciliation_evidence_rows: 2
+team_crosswalk_valid_from: 2025-03-01T00:00:00+00:00
+team_crosswalk_valid_to: 2026-02-28T23:59:59.999999+00:00
+```
+
+The live run carried both immutable `evidence_id` and the specific M3 `evidence_observation_id` into the M4 reconciliation-evidence chain while resolving provider team identity to opaque canonical franchise and season-scoped TeamSeason identity.
 
 Evidence:
 
 - `docs/implementation/M4_ARCHITECTURE_CONFORMANCE_AUDIT.md`
+- `docs/implementation/M4_LOCAL_VALIDATION_20260821.md`
 
-Current state:
+Final state:
 
 ```text
-M4 STATIC AUDIT: COMPLETE
-M4 REMEDIATION: IMPLEMENTED
-M4 MIGRATION v6: IMPLEMENTED
-M4 LOCAL QUALITY GATE: PENDING
-M4 SQLITE v6 GATE: PENDING
-M4 REAL NFLVERSE RECONCILIATION GATE: PENDING
-M4 ARCHITECTURE CERTIFICATION: WITHHELD
+M4 — ARCHITECTURE-CERTIFIED
 ```
+
+Documentation commits after the validated executable head record certification evidence/status only and do not alter the executable behavior that was validated.
 
 ---
 
 ## Next Certification Target
 
 ```text
-M4 — Identity & Reconciliation Engine
-Primary architecture dependency: F-3 — Canonical Identity & Reconciliation
+M5 — Historical PIT Engine
+Primary architecture dependency: F-4 — Historical Point-in-Time Architecture
 ```
 
-M4 remains the active target until all executable gates pass. M5 does not become the certification target merely because provisional M5 code exists.
+M5 must consume the certified M0–M4 contracts. Existing provisional PIT code is evidence to audit, not authority to redefine historical knowledge-state or leakage semantics.
