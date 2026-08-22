@@ -242,7 +242,7 @@ def test_snapshot_persistence_is_idempotent_sealed_and_feature_complete(tmp_path
             )
 
 
-def test_snapshot_rejects_cutoff_that_disagrees_with_retrospective_actual_kickoff(
+def test_snapshot_rejects_prediction_at_or_after_retrospective_actual_kickoff(
     tmp_path: Path,
 ) -> None:
     database = tmp_path / "pit.db"
@@ -252,7 +252,7 @@ def test_snapshot_rejects_cutoff_that_disagrees_with_retrospective_actual_kickof
         record_provider(connection, NFLVERSE_DESCRIPTOR)
         game_id, canonical_cutoff = _insert_game(connection)
         actual_kickoff = canonical_cutoff.kickoff - timedelta(minutes=30)
-        observation_time = canonical_cutoff.prediction_time - timedelta(hours=2)
+        retrospective_observation = canonical_cutoff.kickoff + timedelta(hours=4)
         connection.execute(
             """
             INSERT INTO schedule_observations(
@@ -269,9 +269,9 @@ def test_snapshot_rejects_cutoff_that_disagrees_with_retrospective_actual_kickof
                 "FINAL",
                 canonical_cutoff.kickoff.isoformat(),
                 actual_kickoff.isoformat(),
-                observation_time.isoformat(),
-                (observation_time + timedelta(seconds=1)).isoformat(),
-                observation_time.isoformat(),
+                retrospective_observation.isoformat(),
+                (retrospective_observation + timedelta(seconds=1)).isoformat(),
+                retrospective_observation.isoformat(),
                 AvailabilityMethod.OUR_OBSERVATION_TIME.value,
                 AvailabilityConfidence.HIGH.value,
             ),
@@ -279,7 +279,7 @@ def test_snapshot_rejects_cutoff_that_disagrees_with_retrospective_actual_kickof
         stale_cutoff = PredictionCutoff(
             game_id=canonical_cutoff.game_id,
             kickoff=canonical_cutoff.kickoff,
-            prediction_time=actual_kickoff - timedelta(minutes=5),
+            prediction_time=actual_kickoff + timedelta(minutes=5),
         )
         manifest = build_snapshot_manifest(
             cutoff=stale_cutoff,
@@ -287,5 +287,5 @@ def test_snapshot_rejects_cutoff_that_disagrees_with_retrospective_actual_kickof
             feature_spec=_feature_spec(),
         )
 
-        with pytest.raises(PITSnapshotConflictError, match="must match retrospective"):
+        with pytest.raises(PITSnapshotConflictError, match="at or after actual kickoff"):
             record_snapshot(connection, manifest)
