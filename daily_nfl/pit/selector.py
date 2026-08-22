@@ -117,16 +117,18 @@ def select_latest_bitemporal_as_of[T](
     """Select state valid in reality and knowable by the prediction cutoff.
 
     This is the explicit F-4 bitemporal helper. `state_time` defaults to the
-    prediction timestamp. Every knowledge-eligible observation passed to this
-    state query must carry `effective_at`; otherwise the engine refuses to
-    guess its real-world validity interval.
+    prediction timestamp. The engine first chooses the latest real-world
+    effective state valid at `state_time`, then the latest defensibly knowable
+    revision of that state. Late corrections to an older effective state cannot
+    displace a newer real-world state merely because their knowledge timestamp
+    is later.
     """
 
     resolved_state_time = state_time or cutoff.prediction_time
     if resolved_state_time.tzinfo is None or resolved_state_time.utcoffset() is None:
         raise ValueError("state_time must be timezone-aware")
 
-    eligible: list[PITObservation[T]] = []
+    grouped: dict[str, list[PITObservation[T]]] = {}
     for observation in observations:
         if not is_input_eligible(observation.input_ref, cutoff, policy):
             continue
@@ -137,6 +139,20 @@ def select_latest_bitemporal_as_of[T](
                 f"knowledge-eligible observation; missing on {observation.input_ref.input_id!r}"
             )
         if effective_at <= resolved_state_time:
-            eligible.append(observation)
+            grouped.setdefault(observation.logical_key, []).append(observation)
 
-    return _select_latest_by_knowledge(eligible)
+    latest_state_revisions: list[PITObservation[T]] = []
+    for logical_key in sorted(grouped):
+        candidates = grouped[logical_key]
+        latest_effective_at = max(
+            candidate.input_ref.effective_at
+            for candidate in candidates
+            if candidate.input_ref.effective_at is not None
+        )
+        latest_state_revisions.extend(
+            candidate
+            for candidate in candidates
+            if candidate.input_ref.effective_at == latest_effective_at
+        )
+
+    return _select_latest_by_knowledge(latest_state_revisions)
