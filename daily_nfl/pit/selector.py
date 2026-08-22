@@ -53,6 +53,9 @@ def is_input_eligible(
         and not policy.allow_inferred_report_date
     ):
         return False
+    if policy.require_context_metadata and input_ref.evidence_id is not None:
+        if input_ref.evidence_observation_id is None or input_ref.provider_id is None:
+            return False
     return ConfidenceRank[input_ref.availability_confidence] >= ConfidenceRank[
         policy.minimum_confidence
     ]
@@ -84,6 +87,16 @@ def _select_latest_by_knowledge[T](
         selected.append(min(top, key=lambda candidate: candidate.input_ref.input_id))
 
     return tuple(selected)
+
+
+def _required_effective_at[T](observation: PITObservation[T]) -> datetime:
+    effective_at = observation.input_ref.effective_at
+    if effective_at is None:
+        raise PITSelectionConflictError(
+            "bitemporal PIT selection requires effective_at for every "
+            f"knowledge-eligible observation; missing on {observation.input_ref.input_id!r}"
+        )
+    return effective_at
 
 
 def select_latest_as_of[T](
@@ -132,27 +145,18 @@ def select_latest_bitemporal_as_of[T](
     for observation in observations:
         if not is_input_eligible(observation.input_ref, cutoff, policy):
             continue
-        effective_at = observation.input_ref.effective_at
-        if effective_at is None:
-            raise PITSelectionConflictError(
-                "bitemporal PIT selection requires effective_at for every "
-                f"knowledge-eligible observation; missing on {observation.input_ref.input_id!r}"
-            )
+        effective_at = _required_effective_at(observation)
         if effective_at <= resolved_state_time:
             grouped.setdefault(observation.logical_key, []).append(observation)
 
     latest_state_revisions: list[PITObservation[T]] = []
     for logical_key in sorted(grouped):
         candidates = grouped[logical_key]
-        latest_effective_at = max(
-            candidate.input_ref.effective_at
-            for candidate in candidates
-            if candidate.input_ref.effective_at is not None
-        )
+        latest_effective_at = max(_required_effective_at(candidate) for candidate in candidates)
         latest_state_revisions.extend(
             candidate
             for candidate in candidates
-            if candidate.input_ref.effective_at == latest_effective_at
+            if _required_effective_at(candidate) == latest_effective_at
         )
 
     return _select_latest_by_knowledge(latest_state_revisions)
