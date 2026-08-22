@@ -47,6 +47,13 @@ def _optional_bool(value: object | None) -> bool | None:
     return bool(int(value)) if value is not None else None
 
 
+def _first_text(*values: object | None) -> str | None:
+    for value in values:
+        if value is not None:
+            return str(value)
+    return None
+
+
 def _schedule_payload_sha256(row: sqlite3.Row) -> str:
     payload = {
         "provider_id": str(row["provider_id"]),
@@ -137,10 +144,16 @@ def schedule_state_as_of(
             schedule.provider_revision,
             raw.sha256 AS raw_sha256,
             raw.provider_schema_version AS raw_provider_schema_version,
-            raw.parser_version AS raw_parser_version
+            raw.parser_version AS raw_parser_version,
+            acquisition.evidence_id AS acquisition_evidence_id,
+            acquisition.provider_id AS acquisition_provider_id,
+            acquisition.provider_schema_version AS acquisition_provider_schema_version,
+            acquisition.parser_version AS acquisition_parser_version
         FROM schedule_observations AS schedule
         LEFT JOIN raw_evidence AS raw
           ON raw.evidence_id = schedule.evidence_id
+        LEFT JOIN raw_evidence_observations AS acquisition
+          ON acquisition.evidence_observation_id = schedule.evidence_observation_id
         WHERE schedule.game_id = ?
         ORDER BY schedule.provider_id, schedule.available_at, schedule.observation_id
         """,
@@ -154,6 +167,15 @@ def schedule_state_as_of(
         if available_at is None or scheduled_kickoff is None:
             raise ValueError("schedule observation is missing required PIT timestamps")
         evidence_id = _optional_text(row["evidence_id"])
+        evidence_observation_id = _optional_text(row["evidence_observation_id"])
+        if evidence_observation_id is not None:
+            if (
+                _optional_text(row["acquisition_evidence_id"]) != evidence_id
+                or _optional_text(row["acquisition_provider_id"]) != str(row["provider_id"])
+            ):
+                raise PITSelectionConflictError(
+                    "schedule observation acquisition provenance disagrees with raw/provider identity"
+                )
         input_ref = PITInputRef(
             input_kind=PITInputKind.SCHEDULE,
             input_id=str(row["observation_id"]),
@@ -164,11 +186,17 @@ def schedule_state_as_of(
             ),
             source_table="schedule_observations",
             evidence_id=evidence_id,
-            evidence_observation_id=_optional_text(row["evidence_observation_id"]),
+            evidence_observation_id=evidence_observation_id,
             provider_id=str(row["provider_id"]),
             provider_revision=_optional_text(row["provider_revision"]),
-            provider_schema_version=_optional_text(row["raw_provider_schema_version"]),
-            parser_version=_optional_text(row["raw_parser_version"]),
+            provider_schema_version=_first_text(
+                row["acquisition_provider_schema_version"],
+                row["raw_provider_schema_version"],
+            ),
+            parser_version=_first_text(
+                row["acquisition_parser_version"],
+                row["raw_parser_version"],
+            ),
             subject_game_id=game_id,
             effective_at=_parse_time(row["effective_at"]),
             published_at=_parse_time(row["published_at"]),
