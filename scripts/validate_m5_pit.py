@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sqlite3
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -67,8 +68,8 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _seed_game(connection: object, kickoff: datetime) -> GameId:
-    repository = IdentityRepository(connection)  # type: ignore[arg-type]
+def _seed_game(connection: sqlite3.Connection, kickoff: datetime) -> GameId:
+    repository = IdentityRepository(connection)
     home = new_franchise_id(UUID("11111111-1111-1111-1111-111111111111"))
     away = new_franchise_id(UUID("22222222-2222-2222-2222-222222222222"))
     repository.ensure_franchise(home, "M5 Fixture Home")
@@ -79,7 +80,7 @@ def _seed_game(connection: object, kickoff: datetime) -> GameId:
     repository.ensure_team_season(away_team, away, 2026)
     event_id = new_event_id(UUID("33333333-3333-3333-3333-333333333333"))
     game_id = game_id_for_event(event_id)
-    connection.execute(  # type: ignore[attr-defined]
+    connection.execute(
         """
         INSERT INTO games(
             game_id, event_id, season, season_phase, week, ruleset_version,
@@ -285,8 +286,12 @@ def main() -> int:
         "later_observation_id": later_state.observation_id,
         "early_status": early_state.status,
         "later_status": later_state.status,
-        "later_correction_hidden_at_early_cutoff": early_state.observation_id == "m5-schedule-v1",
-        "later_correction_visible_at_late_cutoff": later_state.observation_id == "m5-schedule-v2",
+        "later_correction_hidden_at_early_cutoff": (
+            early_state.observation_id == "m5-schedule-v1"
+        ),
+        "later_correction_visible_at_late_cutoff": (
+            later_state.observation_id == "m5-schedule-v2"
+        ),
         "snapshot_id": manifest.snapshot_id,
         "snapshot_sealed": seal_row is not None,
         "snapshot_input_count": len(manifest.inputs),
