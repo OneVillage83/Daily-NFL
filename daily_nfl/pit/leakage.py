@@ -64,6 +64,14 @@ def find_leakage(
                 )
             )
 
+        if policy.require_context_metadata and input_ref.evidence_id is not None:
+            if input_ref.evidence_observation_id is None or input_ref.provider_id is None:
+                _append_missing_context(
+                    violations,
+                    input_ref,
+                    "raw-backed PIT input requires acquisition observation and provider provenance",
+                )
+
         is_current_game = input_ref.subject_game_id == cutoff.game_id
         if input_ref.input_kind in {
             PITInputKind.CURRENT_GAME_RESULT,
