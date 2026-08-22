@@ -55,12 +55,13 @@ def _first_text(*values: object | None) -> str | None:
 
 
 def _schedule_payload_sha256(row: sqlite3.Row) -> str:
+    """Hash only pregame-safe schedule state, never retrospective actual kickoff."""
+
     payload = {
         "provider_id": str(row["provider_id"]),
         "provider_game_id": _optional_text(row["provider_game_id"]),
         "status": str(row["status"]),
         "scheduled_kickoff": str(row["scheduled_kickoff"]),
-        "actual_kickoff": _optional_text(row["actual_kickoff"]),
         "venue_id": _optional_text(row["venue_id"]),
         "neutral_site": _optional_bool(row["neutral_site"]),
         "schedule_version": _optional_text(row["schedule_version"]),
@@ -77,7 +78,6 @@ def _schedule_state_signature(row: sqlite3.Row) -> tuple[object, ...]:
     return (
         str(row["status"]),
         scheduled_kickoff,
-        _parse_time(row["actual_kickoff"]),
         _optional_text(row["venue_id"]),
         _optional_bool(row["neutral_site"]),
         _optional_text(row["schedule_version"]),
@@ -92,7 +92,6 @@ class ScheduleStateAsOf:
     provider_game_id: str | None
     status: str
     scheduled_kickoff: datetime
-    actual_kickoff: datetime | None
     venue_id: str | None
     neutral_site: bool | None
     schedule_version: str | None
@@ -108,12 +107,14 @@ def schedule_state_as_of(
     cutoff: PredictionCutoff,
     policy: PITPolicy = DEFAULT_PIT_POLICY,
 ) -> ScheduleStateAsOf | None:
-    """Return the latest defensible schedule state known by the cutoff.
+    """Return the latest defensible pregame schedule state known by the cutoff.
 
     Revisions are selected independently inside each provider namespace. If two
     providers disagree on canonical schedule state at the same prediction time,
     M5 fails closed rather than silently allowing the newest provider row to
-    overwrite the other source.
+    overwrite the other source. Retrospective ``actual_kickoff`` is deliberately
+    excluded from this pregame state; it is used only as a hard boundary when a
+    snapshot is sealed.
     """
 
     if game_id != cutoff.game_id:
@@ -130,7 +131,6 @@ def schedule_state_as_of(
             schedule.provider_game_id,
             schedule.status,
             schedule.scheduled_kickoff,
-            schedule.actual_kickoff,
             schedule.venue_id,
             schedule.neutral_site,
             schedule.schedule_version,
@@ -243,7 +243,6 @@ def schedule_state_as_of(
         provider_game_id=_optional_text(row["provider_game_id"]),
         status=str(row["status"]),
         scheduled_kickoff=scheduled_kickoff,
-        actual_kickoff=_parse_time(row["actual_kickoff"]),
         venue_id=_optional_text(row["venue_id"]),
         neutral_site=_optional_bool(row["neutral_site"]),
         schedule_version=_optional_text(row["schedule_version"]),
