@@ -7,12 +7,15 @@ from daily_nfl.pit.availability import (
 )
 from daily_nfl.pit.contracts import (
     DEFAULT_PIT_POLICY,
+    PITFeatureSnapshotSpec,
+    PITFeatureValue,
     PITHorizon,
     PITInputKind,
     PITInputRef,
     PITLeakageCode,
     PITLeakageViolation,
     PITPolicy,
+    PITValidationResult,
     PredictionCutoff,
 )
 from daily_nfl.pit.leakage import PITLeakageError, assert_no_leakage, find_leakage
@@ -22,6 +25,7 @@ from daily_nfl.pit.selector import (
     PITSelectionConflictError,
     is_input_eligible,
     select_latest_as_of,
+    select_latest_bitemporal_as_of,
 )
 from daily_nfl.pit.snapshot import (
     PITSnapshotConflictError,
@@ -34,6 +38,8 @@ __all__ = [
     "AvailabilityEvidence",
     "DEFAULT_PIT_POLICY",
     "IndefensibleAvailabilityError",
+    "PITFeatureSnapshotSpec",
+    "PITFeatureValue",
     "PITHorizon",
     "PITInputKind",
     "PITInputRef",
@@ -45,6 +51,7 @@ __all__ = [
     "PITSelectionConflictError",
     "PITSnapshotConflictError",
     "PITSnapshotManifest",
+    "PITValidationResult",
     "PredictionCutoff",
     "ScheduleStateAsOf",
     "assert_no_leakage",
@@ -55,4 +62,5 @@ __all__ = [
     "record_snapshot",
     "schedule_state_as_of",
     "select_latest_as_of",
+    "select_latest_bitemporal_as_of",
 ]
