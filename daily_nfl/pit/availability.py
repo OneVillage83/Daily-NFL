@@ -53,37 +53,49 @@ def derive_knowledge_timestamp(
 ) -> KnowledgeTimestamp:
     """Derive the earliest defensible historical availability clock.
 
-    Precedence favors explicit source timestamps/publication times, then an
-    archived release timestamp, then our own observation time. Inferred report
-    dates remain weak evidence. With no historical availability evidence,
-    strict mode fails closed; permissive callers may retain ingestion time as
-    UNKNOWN/LOW evidence without treating it as historically PIT-safe.
+    F-4 defines source/publication timestamps, archived release times, and our
+    own observation time as high-confidence evidence when they are genuinely
+    available. When more than one such clock exists, the earliest defensible
+    public/observed clock is the knowledge boundary. Inferred report dates are
+    medium-confidence evidence and remain excluded by the default strict PIT
+    policy unless explicitly authorized by the caller.
     """
+
+    high_confidence: list[tuple[datetime, AvailabilityMethod]] = []
+    if evidence.source_timestamp is not None:
+        high_confidence.append(
+            (evidence.source_timestamp, AvailabilityMethod.SOURCE_TIMESTAMP)
+        )
+    if evidence.published_at is not None:
+        high_confidence.append((evidence.published_at, AvailabilityMethod.SOURCE_TIMESTAMP))
+    if evidence.archived_release_time is not None:
+        high_confidence.append(
+            (evidence.archived_release_time, AvailabilityMethod.ARCHIVED_RELEASE_TIME)
+        )
+    if evidence.observed_at is not None:
+        high_confidence.append(
+            (evidence.observed_at, AvailabilityMethod.OUR_OBSERVATION_TIME)
+        )
 
     available_at: datetime | None = None
     method = AvailabilityMethod.UNKNOWN
     confidence = AvailabilityConfidence.LOW
 
-    if evidence.source_timestamp is not None:
-        available_at = evidence.source_timestamp
-        method = AvailabilityMethod.SOURCE_TIMESTAMP
-        confidence = AvailabilityConfidence.HIGH
-    elif evidence.published_at is not None:
-        available_at = evidence.published_at
-        method = AvailabilityMethod.SOURCE_TIMESTAMP
-        confidence = AvailabilityConfidence.HIGH
-    elif evidence.archived_release_time is not None:
-        available_at = evidence.archived_release_time
-        method = AvailabilityMethod.ARCHIVED_RELEASE_TIME
-        confidence = AvailabilityConfidence.HIGH
-    elif evidence.observed_at is not None:
-        available_at = evidence.observed_at
-        method = AvailabilityMethod.OUR_OBSERVATION_TIME
+    if high_confidence:
+        method_priority = {
+            AvailabilityMethod.SOURCE_TIMESTAMP: 0,
+            AvailabilityMethod.ARCHIVED_RELEASE_TIME: 1,
+            AvailabilityMethod.OUR_OBSERVATION_TIME: 2,
+        }
+        available_at, method = min(
+            high_confidence,
+            key=lambda candidate: (candidate[0], method_priority[candidate[1]]),
+        )
         confidence = AvailabilityConfidence.HIGH
     elif evidence.inferred_report_date is not None:
         available_at = evidence.inferred_report_date
         method = AvailabilityMethod.INFERRED_REPORT_DATE
-        confidence = AvailabilityConfidence.LOW
+        confidence = AvailabilityConfidence.MEDIUM
     elif evidence.ingested_at is not None and not strict:
         available_at = evidence.ingested_at
 
@@ -95,6 +107,10 @@ def derive_knowledge_timestamp(
     if evidence.observed_at is not None and available_at > evidence.observed_at:
         raise IndefensibleAvailabilityError(
             "derived available_at cannot be later than our observation time"
+        )
+    if evidence.ingested_at is not None and available_at > evidence.ingested_at:
+        raise IndefensibleAvailabilityError(
+            "derived available_at cannot be later than ingestion time"
         )
 
     return KnowledgeTimestamp(
