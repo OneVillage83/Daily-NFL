@@ -9,7 +9,6 @@ from enum import StrEnum
 
 from daily_nfl.domain import AvailabilityConfidence, AvailabilityMethod, GameId
 
-
 type PITFeatureScalar = str | int | float | bool | None
 
 
