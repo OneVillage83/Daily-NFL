@@ -83,7 +83,7 @@ WHEN (NEW.evidence_id IS NOT NULL OR NEW.evidence_observation_id IS NOT NULL)
     )
 )
 BEGIN
-    SELECT RAISE(ABORT, 'PIT input raw provenance must match evidence observation/provider/checksum');
+    SELECT RAISE(ABORT, 'PIT raw provenance must match evidence observation/provider/checksum');
 END;
 
 CREATE TRIGGER pit_snapshot_seals_require_validated_manifest
