@@ -9,9 +9,9 @@ import pytest
 from daily_nfl.domain import AvailabilityConfidence, AvailabilityMethod, GameId
 from daily_nfl.persistence import apply_migrations, open_database
 from daily_nfl.pit import (
-    PITHorizon,
     PITFeatureSnapshotSpec,
     PITFeatureValue,
+    PITHorizon,
     PITInputKind,
     PITInputRef,
     PITSnapshotConflictError,
