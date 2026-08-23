@@ -10,8 +10,8 @@ from datetime import UTC, datetime
 
 from daily_nfl.pit.contracts import (
     DEFAULT_PIT_POLICY,
-    PITFeatureSnapshotSpec,
     PITFeatureScalar,
+    PITFeatureSnapshotSpec,
     PITInputRef,
     PITPolicy,
     PITValidationResult,
