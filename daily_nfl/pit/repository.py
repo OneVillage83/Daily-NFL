@@ -80,7 +80,6 @@ def _schedule_state_signature(row: sqlite3.Row) -> tuple[object, ...]:
         scheduled_kickoff,
         _optional_text(row["venue_id"]),
         _optional_bool(row["neutral_site"]),
-        _optional_text(row["schedule_version"]),
     )
 
 
