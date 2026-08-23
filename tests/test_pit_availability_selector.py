@@ -20,6 +20,7 @@ from daily_nfl.pit import (
     derive_knowledge_timestamp,
     is_input_eligible,
     select_latest_as_of,
+    select_latest_bitemporal_as_of,
 )
 
 
@@ -38,7 +39,12 @@ def _input(
     payload_sha256: str = "a" * 64,
     method: AvailabilityMethod = AvailabilityMethod.SOURCE_TIMESTAMP,
     confidence: AvailabilityConfidence = AvailabilityConfidence.HIGH,
+    observed_at: datetime | None = None,
+    ingested_at: datetime | None = None,
+    effective_at: datetime | None = None,
 ) -> PITInputRef:
+    observed = observed_at or available_at
+    ingested = ingested_at or observed + timedelta(seconds=1)
     return PITInputRef(
         input_kind=PITInputKind.INJURY,
         input_id=input_id,
@@ -46,8 +52,9 @@ def _input(
         availability_method=method,
         availability_confidence=confidence,
         source_table="fixture_observations",
-        observed_at=available_at,
-        ingested_at=available_at + timedelta(seconds=1),
+        effective_at=effective_at,
+        observed_at=observed,
+        ingested_at=ingested,
         payload_sha256=payload_sha256,
     )
 
@@ -59,19 +66,21 @@ def test_standard_horizon_derives_exact_prediction_cutoff() -> None:
     assert cutoff.prediction_time < cutoff.kickoff
 
 
-def test_source_timestamp_has_priority_for_defensible_availability() -> None:
-    source = datetime(2026, 9, 9, 15, 0, tzinfo=UTC)
+def test_earliest_high_confidence_availability_evidence_wins() -> None:
+    archived = datetime(2026, 9, 9, 14, 0, tzinfo=UTC)
+    source = archived + timedelta(hours=1)
     observed = source + timedelta(hours=2)
     knowledge = derive_knowledge_timestamp(
         AvailabilityEvidence(
             source_timestamp=source,
+            archived_release_time=archived,
             observed_at=observed,
             ingested_at=observed + timedelta(seconds=1),
         )
     )
 
-    assert knowledge.available_at == source
-    assert knowledge.availability_method is AvailabilityMethod.SOURCE_TIMESTAMP
+    assert knowledge.available_at == archived
+    assert knowledge.availability_method is AvailabilityMethod.ARCHIVED_RELEASE_TIME
     assert knowledge.availability_confidence is AvailabilityConfidence.HIGH
 
 
@@ -92,7 +101,29 @@ def test_permissive_backfill_can_record_ingestion_but_marks_it_unknown_low() -> 
     assert knowledge.availability_confidence is AvailabilityConfidence.LOW
 
 
-def test_strict_policy_rejects_unknown_and_inferred_low_confidence() -> None:
+def test_inferred_report_date_is_medium_but_requires_explicit_policy_opt_in() -> None:
+    cutoff = _cutoff()
+    inferred_at = cutoff.prediction_time - timedelta(hours=1)
+    knowledge = derive_knowledge_timestamp(
+        AvailabilityEvidence(inferred_report_date=inferred_at)
+    )
+    inferred = _input(
+        "inferred",
+        knowledge.available_at,
+        method=knowledge.availability_method,
+        confidence=knowledge.availability_confidence,
+    )
+
+    assert knowledge.availability_confidence is AvailabilityConfidence.MEDIUM
+    assert not is_input_eligible(inferred, cutoff, PITPolicy())
+    assert is_input_eligible(
+        inferred,
+        cutoff,
+        PITPolicy(allow_inferred_report_date=True),
+    )
+
+
+def test_strict_policy_rejects_unknown_low_confidence() -> None:
     cutoff = _cutoff()
     unknown = _input(
         "unknown",
@@ -100,15 +131,8 @@ def test_strict_policy_rejects_unknown_and_inferred_low_confidence() -> None:
         method=AvailabilityMethod.UNKNOWN,
         confidence=AvailabilityConfidence.LOW,
     )
-    inferred = _input(
-        "inferred",
-        cutoff.prediction_time - timedelta(hours=1),
-        method=AvailabilityMethod.INFERRED_REPORT_DATE,
-        confidence=AvailabilityConfidence.LOW,
-    )
 
     assert not is_input_eligible(unknown, cutoff, PITPolicy())
-    assert not is_input_eligible(inferred, cutoff, PITPolicy())
 
 
 def test_sunday_game_day_information_is_eligible_before_cutoff() -> None:
@@ -161,19 +185,96 @@ def test_selector_uses_correction_after_later_cutoff() -> None:
     assert selected[0].value == "OUT"
 
 
-def test_equally_ranked_conflicting_revisions_fail_closed() -> None:
+def test_same_knowledge_conflict_fails_even_when_observed_later() -> None:
+    cutoff = _cutoff()
+    available = cutoff.prediction_time - timedelta(hours=1)
+    original = PITObservation(
+        logical_key="same-key",
+        input_ref=_input(
+            "original",
+            available,
+            payload_sha256="a" * 64,
+            observed_at=available,
+        ),
+        value="A",
+    )
+    retrospective_correction = PITObservation(
+        logical_key="same-key",
+        input_ref=_input(
+            "retrospective",
+            available,
+            payload_sha256="b" * 64,
+            observed_at=available + timedelta(days=100),
+            ingested_at=available + timedelta(days=100, seconds=1),
+        ),
+        value="B",
+    )
+
+    with pytest.raises(PITSelectionConflictError, match="same knowledge timestamp"):
+        select_latest_as_of((original, retrospective_correction), cutoff=cutoff)
+
+
+def test_same_knowledge_duplicate_payload_is_deterministic() -> None:
     cutoff = _cutoff()
     available = cutoff.prediction_time - timedelta(hours=1)
     first = PITObservation(
         logical_key="same-key",
-        input_ref=_input("a", available, payload_sha256="a" * 64),
-        value="A",
+        input_ref=_input("b", available, payload_sha256="a" * 64),
+        value="same",
     )
     second = PITObservation(
         logical_key="same-key",
-        input_ref=_input("b", available, payload_sha256="b" * 64),
-        value="B",
+        input_ref=_input(
+            "a",
+            available,
+            payload_sha256="a" * 64,
+            observed_at=available + timedelta(minutes=1),
+        ),
+        value="same",
     )
 
-    with pytest.raises(PITSelectionConflictError, match="equally ranked"):
-        select_latest_as_of((first, second), cutoff=cutoff)
+    selected = select_latest_as_of((first, second), cutoff=cutoff)
+
+    assert selected[0].input_ref.input_id == "a"
+
+
+def test_bitemporal_selector_excludes_known_future_effective_state() -> None:
+    cutoff = _cutoff()
+    old = PITObservation(
+        logical_key="player:fixture:status",
+        input_ref=_input(
+            "old",
+            cutoff.prediction_time - timedelta(hours=3),
+            payload_sha256="a" * 64,
+            effective_at=cutoff.prediction_time - timedelta(days=1),
+        ),
+        value="ACTIVE",
+    )
+    announced_future = PITObservation(
+        logical_key="player:fixture:status",
+        input_ref=_input(
+            "future-effective",
+            cutoff.prediction_time - timedelta(hours=1),
+            payload_sha256="b" * 64,
+            effective_at=cutoff.prediction_time + timedelta(hours=1),
+        ),
+        value="RELEASED",
+    )
+
+    knowledge_only = select_latest_as_of((old, announced_future), cutoff=cutoff)
+    bitemporal = select_latest_bitemporal_as_of((old, announced_future), cutoff=cutoff)
+
+    assert knowledge_only[0].value == "RELEASED"
+    assert bitemporal[0].value == "ACTIVE"
+
+
+def test_bitemporal_selector_fails_if_effective_time_is_missing() -> None:
+    cutoff = _cutoff()
+    observation = PITObservation(
+        logical_key="player:fixture:status",
+        input_ref=_input("missing-effective", cutoff.prediction_time - timedelta(hours=1)),
+        value="ACTIVE",
+    )
+
+    with pytest.raises(PITSelectionConflictError, match="requires effective_at"):
+        select_latest_bitemporal_as_of((observation,), cutoff=cutoff)

@@ -28,6 +28,8 @@ def _input(
     market_quote_at: datetime | None = None,
     source_game_kickoff: datetime | None = None,
     season_complete_at: datetime | None = None,
+    provider_id: str | None = None,
+    provider_revision: str | None = None,
 ) -> PITInputRef:
     cutoff = _cutoff()
     return PITInputRef(
@@ -41,6 +43,8 @@ def _input(
         market_quote_at=market_quote_at,
         source_game_kickoff=source_game_kickoff,
         season_complete_at=season_complete_at,
+        provider_id=provider_id,
+        provider_revision=provider_revision,
     )
 
 
@@ -74,6 +78,17 @@ def test_current_game_final_score_stats_and_plays_are_rejected() -> None:
         )
 
 
+def test_current_game_outcome_kind_without_cutoff_game_context_fails_closed() -> None:
+    for kind in (
+        PITInputKind.CURRENT_GAME_RESULT,
+        PITInputKind.CURRENT_GAME_STAT,
+        PITInputKind.CURRENT_GAME_PLAY,
+    ):
+        assert PITLeakageCode.MISSING_REQUIRED_CONTEXT in _codes(
+            _input(f"missing-context-{kind.value}", kind)
+        )
+
+
 def test_actual_weather_cannot_replace_current_game_forecast() -> None:
     codes = _codes(
         _input(
@@ -84,6 +99,12 @@ def test_actual_weather_cannot_replace_current_game_forecast() -> None:
     )
 
     assert PITLeakageCode.ACTUAL_WEATHER_FOR_CURRENT_GAME in codes
+
+
+def test_actual_weather_without_subject_game_fails_closed() -> None:
+    codes = _codes(_input("unscoped-actual-weather", PITInputKind.WEATHER_ACTUAL))
+
+    assert PITLeakageCode.MISSING_REQUIRED_CONTEXT in codes
 
 
 def test_later_market_quote_is_rejected_even_if_mislabeled_available_early() -> None:
@@ -99,6 +120,12 @@ def test_later_market_quote_is_rejected_even_if_mislabeled_available_early() -> 
     assert PITLeakageCode.LATER_MARKET_QUOTE in codes
 
 
+def test_market_quote_without_quote_timestamp_fails_closed() -> None:
+    codes = _codes(_input("untimestamped-market", PITInputKind.MARKET_QUOTE))
+
+    assert PITLeakageCode.MISSING_REQUIRED_CONTEXT in codes
+
+
 def test_future_opponent_game_information_is_rejected() -> None:
     cutoff = _cutoff()
     codes = _codes(
@@ -110,6 +137,12 @@ def test_future_opponent_game_information_is_rejected() -> None:
     )
 
     assert PITLeakageCode.FUTURE_GAME_INFORMATION in codes
+
+
+def test_game_reference_without_source_kickoff_fails_closed() -> None:
+    codes = _codes(_input("unbounded-game", PITInputKind.FUTURE_GAME))
+
+    assert PITLeakageCode.MISSING_REQUIRED_CONTEXT in codes
 
 
 def test_end_of_season_aggregate_is_rejected_midseason() -> None:
@@ -125,6 +158,12 @@ def test_end_of_season_aggregate_is_rejected_midseason() -> None:
     assert PITLeakageCode.END_OF_SEASON_INFORMATION in codes
 
 
+def test_end_of_season_aggregate_without_completion_time_fails_closed() -> None:
+    codes = _codes(_input("unbounded-season-final", PITInputKind.SEASON_FINAL_AGGREGATE))
+
+    assert PITLeakageCode.MISSING_REQUIRED_CONTEXT in codes
+
+
 def test_indefensible_provider_correction_is_rejected() -> None:
     codes = _codes(
         _input(
@@ -136,6 +175,19 @@ def test_indefensible_provider_correction_is_rejected() -> None:
 
     assert PITLeakageCode.INDEFENSIBLE_AVAILABILITY in codes
     assert PITLeakageCode.LATE_PROVIDER_CORRECTION in codes
+    assert PITLeakageCode.MISSING_REQUIRED_CONTEXT in codes
+
+
+def test_provider_correction_requires_provider_and_revision_context() -> None:
+    codes = _codes(
+        _input(
+            "correction",
+            PITInputKind.PROVIDER_CORRECTION,
+            provider_id="nflverse",
+        )
+    )
+
+    assert PITLeakageCode.MISSING_REQUIRED_CONTEXT in codes
 
 
 def test_legitimate_pre_cutoff_inputs_pass() -> None:
@@ -147,6 +199,22 @@ def test_legitimate_pre_cutoff_inputs_pass() -> None:
             "market",
             PITInputKind.MARKET_QUOTE,
             market_quote_at=cutoff.prediction_time - timedelta(minutes=1),
+        ),
+        _input(
+            "prior-game",
+            PITInputKind.FUTURE_GAME,
+            source_game_kickoff=cutoff.prediction_time - timedelta(days=7),
+        ),
+        _input(
+            "historical-season-final",
+            PITInputKind.SEASON_FINAL_AGGREGATE,
+            season_complete_at=cutoff.prediction_time - timedelta(days=200),
+        ),
+        _input(
+            "known-correction",
+            PITInputKind.PROVIDER_CORRECTION,
+            provider_id="nflverse",
+            provider_revision="r2",
         ),
     )
 

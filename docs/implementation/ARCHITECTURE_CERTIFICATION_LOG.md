@@ -39,8 +39,8 @@ M1  Canonical Domain Contracts                         ARCHITECTURE-CERTIFIED
 M2  Persistence & Migration Foundation                 ARCHITECTURE-CERTIFIED
 M3  Raw Evidence & Provider Abstraction                ARCHITECTURE-CERTIFIED
 M4  Identity & Reconciliation Engine                   ARCHITECTURE-CERTIFIED
-M5  Historical PIT Engine                              PROVISIONAL — AUDIT NEXT
-M6  Canonical Play / Drive Normalization               PROVISIONAL
+M5  Historical PIT Engine                              ARCHITECTURE-CERTIFIED
+M6  Canonical Play / Drive Normalization               PROVISIONAL — AUDIT NEXT
 M6B Real nflverse PBP Validation                       COMPLETED IN SUBSTANCE / NOT A SUBSTITUTE FOR M6 CERTIFICATION
 M6C Controlled historical continuation                NOT STARTED
 M7  State Engine V1                                    NOT STARTED
@@ -356,11 +356,98 @@ Documentation commits after the validated executable head record certification e
 
 ---
 
+## 2026-08-23 — M5 Certified
+
+**Milestone:** Historical PIT Engine  
+**Architecture:** F-4 — Historical Point-in-Time Architecture  
+**Validated executable code head:** `d553c3a46b36478b069eae97b7b52f283c97b47a`
+
+Material architecture corrections included:
+
+- defensible availability derivation from explicit temporal evidence with confidence/method tracking;
+- strict separation of effective, publication, observation, ingestion, and derived availability clocks;
+- knowledge-time selection that never uses later observation/ingestion time to resolve a historical tie;
+- fail-closed same-knowledge conflicting revisions;
+- explicit bitemporal selection of real-world effective state plus knowable revision;
+- acquisition-observation identity retained separately from raw content identity;
+- strict leakage-context requirements for current-game outcomes, actual weather, market quotes, future games/labels, season-final aggregates, and provider corrections;
+- immutable feature-input snapshot metadata with feature contract/version, values, coverage/missingness, PIT PASS status, exact input membership, source versions, and checksums;
+- forward-only migration v7 preserving v1-v6 history;
+- database guards for certified raw/acquisition/provider/checksum consistency and complete snapshot membership;
+- provider-scoped schedule revisions and fail-closed cross-provider canonical-state disagreement;
+- provider-specific `schedule_version` retained as provenance but excluded from cross-provider canonical-state equality;
+- all agreeing providers retained in `supporting_inputs` even when provider revision/version labels differ;
+- retrospective `actual_kickoff` excluded from pregame feature state and used only as a hard leakage boundary at snapshot sealing;
+- deterministic M5 historical reconstruction validator with deliberate leakage injection.
+
+Final exact-head quality gate:
+
+```text
+Python 3.12.10
+E:\Daily-NFL\.venv\Scripts\python.exe
+targeted PIT repository regression: 5 passed in 0.57s
+Ruff: All checks passed!
+mypy: Success: no issues found in 82 source files
+pytest: 161 passed in 3.64s
+git status --short: clean
+```
+
+SQLite gate:
+
+```text
+fresh DB: schema 0 -> 7
+foreign_keys_enabled: true
+integrity_ok: true
+mode: migrate
+
+check DB: schema 7 -> 7
+foreign_keys_enabled: true
+integrity_ok: true
+mode: check
+```
+
+Deterministic historical PIT reconstruction gate:
+
+```text
+fixture_season: 2025
+early_observation_id: m5-schedule-v1
+early_status: SCHEDULED
+later_observation_id: m5-schedule-v2
+later_status: POSTPONED
+later_correction_hidden_at_early_cutoff: true
+later_correction_visible_at_late_cutoff: true
+snapshot_sealed: true
+snapshot_input_count: 1
+provider_id: nflverse
+provider_revision: v1
+raw evidence identity: retained
+acquisition-observation identity: retained
+raw SHA-256: retained
+leakage_fail_closed: true
+```
+
+The exact validation run also confirmed that the final cross-provider schedule-state regression accepts identical canonical schedule state with provider-specific schedule/revision labels while preserving both providers as supporting provenance.
+
+Evidence:
+
+- `docs/implementation/M5_ARCHITECTURE_CONFORMANCE_AUDIT.md`
+- `docs/implementation/M5_LOCAL_VALIDATION_20260823.md`
+
+Final state:
+
+```text
+M5 — ARCHITECTURE-CERTIFIED
+```
+
+Documentation/status commits after `d553c3a46b36478b069eae97b7b52f283c97b47a` do not alter the executable behavior that was validated. If later evidence reveals an M5/F-4 defect, M5 must be explicitly reopened and recertified.
+
+---
+
 ## Next Certification Target
 
 ```text
-M5 — Historical PIT Engine
-Primary architecture dependency: F-4 — Historical Point-in-Time Architecture
+M6 — Canonical Play / Drive Normalization
+Primary architecture dependency: F-5 through F-9 football-state architecture, plus certified M0-M5 foundations
 ```
 
-M5 must consume the certified M0–M4 contracts. Existing provisional PIT code is evidence to audit, not authority to redefine historical knowledge-state or leakage semantics.
+The earlier M6/M6B implementation and real nflverse PBP work remain valuable provisional evidence, but they do not replace the formal M6 architecture audit/certification. M6 must consume the certified M0-M5 contracts without silently redefining them.

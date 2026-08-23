@@ -527,7 +527,7 @@ def test_v6_migration_preserves_v5_identity_history(tmp_path: Path) -> None:
         )
         connection.commit()
 
-        assert apply_migrations(connection) == SCHEMA_VERSION == 6
+        assert apply_migrations(connection) == SCHEMA_VERSION
         legacy = connection.execute(
             """
             SELECT canonical_entity_id, decision_id

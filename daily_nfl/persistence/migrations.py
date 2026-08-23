@@ -7,10 +7,11 @@ from daily_nfl.persistence.identity_schema import IDENTITY_RECONCILIATION_SCHEMA
 from daily_nfl.persistence.m2_conformance_schema import M2_CONFORMANCE_SCHEMA_SQL
 from daily_nfl.persistence.m3_provider_schema import M3_PROVIDER_SCHEMA_SQL
 from daily_nfl.persistence.m4_identity_conformance_schema import M4_IDENTITY_CONFORMANCE_SCHEMA_SQL
+from daily_nfl.persistence.m5_pit_conformance_schema import M5_PIT_CONFORMANCE_SCHEMA_SQL
 from daily_nfl.persistence.pit_schema import PIT_SNAPSHOT_SCHEMA_SQL
 from daily_nfl.persistence.schema import INITIAL_SCHEMA_SQL
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,6 +47,11 @@ MIGRATIONS: tuple[Migration, ...] = (
         version=6,
         name="m4_identity_reconciliation_conformance",
         sql=M4_IDENTITY_CONFORMANCE_SCHEMA_SQL,
+    ),
+    Migration(
+        version=7,
+        name="m5_historical_pit_conformance",
+        sql=M5_PIT_CONFORMANCE_SCHEMA_SQL,
     ),
 )
 
