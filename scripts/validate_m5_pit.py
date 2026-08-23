@@ -49,6 +49,7 @@ from daily_nfl.reconciliation import (  # noqa: E402
 )
 
 COMPETITION_ID = "core-competition-nfl"
+FIXTURE_SEASON = 2025
 
 
 def parse_args() -> argparse.Namespace:
@@ -74,10 +75,10 @@ def _seed_game(connection: sqlite3.Connection, kickoff: datetime) -> GameId:
     away = new_franchise_id(UUID("22222222-2222-2222-2222-222222222222"))
     repository.ensure_franchise(home, "M5 Fixture Home")
     repository.ensure_franchise(away, "M5 Fixture Away")
-    home_team = team_season_id_for(home, 2026)
-    away_team = team_season_id_for(away, 2026)
-    repository.ensure_team_season(home_team, home, 2026)
-    repository.ensure_team_season(away_team, away, 2026)
+    home_team = team_season_id_for(home, FIXTURE_SEASON)
+    away_team = team_season_id_for(away, FIXTURE_SEASON)
+    repository.ensure_team_season(home_team, home, FIXTURE_SEASON)
+    repository.ensure_team_season(away_team, away, FIXTURE_SEASON)
     event_id = new_event_id(UUID("33333333-3333-3333-3333-333333333333"))
     game_id = game_id_for_event(event_id)
     connection.execute(
@@ -91,10 +92,10 @@ def _seed_game(connection: sqlite3.Connection, kickoff: datetime) -> GameId:
         (
             str(game_id),
             str(event_id),
-            2026,
+            FIXTURE_SEASON,
             "REGULAR",
             1,
-            "NFL_2026",
+            f"NFL_{FIXTURE_SEASON}",
             str(home_team),
             str(away_team),
             kickoff.isoformat(),
@@ -108,7 +109,11 @@ def main() -> int:
     args = parse_args()
     database: Path = args.database
     raw_root: Path = args.raw_root
-    kickoff = datetime(2026, 9, 10, 20, 20, tzinfo=UTC)
+
+    # This validator must model a genuinely historical information environment.
+    # The acquisition layer stamps ingested_at at runtime, so fixture observations
+    # must not be dated in the future relative to that ingestion event.
+    kickoff = datetime(2025, 9, 11, 20, 20, tzinfo=UTC)
     first_available = kickoff - timedelta(hours=5)
     correction_available = kickoff - timedelta(hours=2)
 
@@ -180,7 +185,7 @@ def main() -> int:
                     stored.artifact.evidence_id,
                     stored.evidence_observation_id,
                     "nflverse",
-                    "2026_01_FIXTURE",
+                    "2025_01_FIXTURE",
                     status,
                     kickoff.isoformat(),
                     0,
@@ -280,6 +285,7 @@ def main() -> int:
     result = {
         "schema_version": schema_version,
         "game_id": str(game_id),
+        "fixture_season": FIXTURE_SEASON,
         "early_cutoff": early_cutoff.prediction_time.isoformat(),
         "later_cutoff": later_cutoff.prediction_time.isoformat(),
         "early_observation_id": early_state.observation_id,
