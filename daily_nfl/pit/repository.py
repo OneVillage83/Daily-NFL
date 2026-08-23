@@ -44,7 +44,7 @@ def _optional_text(value: object | None) -> str | None:
 
 
 def _optional_bool(value: object | None) -> bool | None:
-    return bool(int(value)) if value is not None else None
+    return bool(int(str(value))) if value is not None else None
 
 
 def _first_text(*values: object | None) -> str | None:
@@ -174,7 +174,7 @@ def schedule_state_as_of(
                 or _optional_text(row["acquisition_provider_id"]) != str(row["provider_id"])
             ):
                 raise PITSelectionConflictError(
-                    "schedule observation acquisition provenance disagrees with raw/provider identity"
+                    "schedule acquisition provenance disagrees with raw/provider identity"
                 )
         input_ref = PITInputRef(
             input_kind=PITInputKind.SCHEDULE,
@@ -219,7 +219,9 @@ def schedule_state_as_of(
 
     signatures = {_schedule_state_signature(observation.value) for observation in selected}
     if len(signatures) > 1:
-        providers = sorted(observation.input_ref.provider_id or "UNKNOWN" for observation in selected)
+        providers = sorted(
+            observation.input_ref.provider_id or "UNKNOWN" for observation in selected
+        )
         raise PITSelectionConflictError(
             "conflicting provider schedule states at PIT cutoff for "
             f"game {game_id!s}: {providers}"
