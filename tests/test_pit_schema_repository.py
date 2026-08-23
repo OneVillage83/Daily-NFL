@@ -273,17 +273,19 @@ def test_schedule_as_of_preserves_pregame_fields_and_all_supporting_sources(
                 status="SCHEDULED",
                 kickoff=kickoff,
                 available_at=available,
-                provider_revision="r1",
+                provider_revision=f"r-{suffix}",
                 provider_id=provider_id,
                 neutral_site=True,
-                schedule_version="schedule-v1",
+                schedule_version=f"schedule-{suffix}",
             )
 
         state = schedule_state_as_of(connection, game_id=game_id, cutoff=cutoff)
 
     assert state is not None
     assert state.neutral_site is True
-    assert state.schedule_version == "schedule-v1"
+    assert state.provider_id == "fixture-alt"
+    assert state.schedule_version == "schedule-b"
+    assert state.provider_revision == "r-b"
     assert len(state.supporting_inputs) == 2
     assert {item.provider_id for item in state.supporting_inputs} == {
         "nflverse",
