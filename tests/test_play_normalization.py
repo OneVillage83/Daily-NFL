@@ -4,10 +4,10 @@ from daily_nfl.domain import (
     GameId,
     ParticipationSide,
     PenaltyDisposition,
-    PlayerId,
     PlayDesignModifier,
     PlayEventType,
     PlayType,
+    PlayerId,
     TeamSeasonId,
 )
 from daily_nfl.normalization import (
