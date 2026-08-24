@@ -214,12 +214,14 @@ def _build_events(
     }:
         event_specs.append((PlayEventType.SNAP, None, None))
     if play_type is PlayType.PASS:
-        event_specs.append((PlayEventType.THROW, _participant_for_role(participation, "passer"), None))
+        passer = _participant_for_role(participation, "passer")
+        event_specs.append((PlayEventType.THROW, passer, None))
         target = _participant_for_role(participation, "target")
         if target is not None:
             event_specs.append((PlayEventType.TARGET, target, None))
     if record.complete_pass is True:
-        event_specs.append((PlayEventType.CATCH, _participant_for_role(participation, "target"), None))
+        target = _participant_for_role(participation, "target")
+        event_specs.append((PlayEventType.CATCH, target, None))
     if play_type is PlayType.SACK:
         event_specs.append((PlayEventType.SACK, None, None))
     if record.interception:
