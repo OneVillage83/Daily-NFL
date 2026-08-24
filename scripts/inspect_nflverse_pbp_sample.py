@@ -1,4 +1,4 @@
-"""Inspect one completed nflverse PBP season for M6B contract validation."""
+"""Inspect one completed nflverse PBP season for M6 contract validation."""
 
 from __future__ import annotations
 
@@ -61,6 +61,13 @@ CANDIDATE_COLUMNS = (
     "penalty_yards",
     "penalty_player_id",
     "first_down_penalty",
+    "passer_player_id",
+    "rusher_player_id",
+    "receiver_player_id",
+    "kicker_player_id",
+    "punter_player_id",
+    "return_player_id",
+    "interception_player_id",
     "shotgun",
     "no_huddle",
     "play_action",
@@ -68,6 +75,7 @@ CANDIDATE_COLUMNS = (
     "screen",
     "motion",
     "shift",
+    "under_center",
     "designed_qb_run",
 )
 

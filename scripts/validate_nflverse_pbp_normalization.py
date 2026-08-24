@@ -6,7 +6,7 @@ import argparse
 import json
 import sys
 from collections import Counter, defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import nflreadpy as nfl  # type: ignore[import-untyped]
@@ -15,7 +15,7 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
 
-from daily_nfl.domain import GameId, TeamSeasonId  # noqa: E402
+from daily_nfl.domain import GameId, PlayerId, TeamSeasonId  # noqa: E402
 from daily_nfl.normalization import (  # noqa: E402
     NflverseGameContext,
     NflversePlayRecord,
@@ -43,25 +43,58 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _context(game_id: str, home: str, away: str) -> NflverseGameContext:
+def _context(
+    game_id: str,
+    home: str,
+    away: str,
+    player_ids: dict[str, PlayerId],
+) -> NflverseGameContext:
     return NflverseGameContext(
         game_id=GameId(f"m6b_{game_id}"),
         home_team_code=home,
         away_team_code=away,
         home_team_season_id=TeamSeasonId(f"m6b_{game_id}_{home}"),
         away_team_season_id=TeamSeasonId(f"m6b_{game_id}_{away}"),
+        player_ids_by_external_id=player_ids,
     )
 
 
-def _record_context(row: dict[str, object], record: NflversePlayRecord) -> NflverseGameContext:
+def _record_context(
+    row: dict[str, object],
+    record: NflversePlayRecord,
+    player_ids: dict[str, PlayerId],
+) -> NflverseGameContext:
     home = str(row.get("home_team") or "").strip()
     away = str(row.get("away_team") or "").strip()
     if not home or not away:
         raise ValueError("home_team/away_team missing")
-    return _context(record.provider_game_id, home, away)
+    return _context(record.provider_game_id, home, away, player_ids)
 
 
-def _reject_sample(row: dict[str, object]) -> dict[str, object]:
+def _provider_player_ids(record: NflversePlayRecord) -> tuple[str, ...]:
+    values = [item.player_external_id for item in record.participants]
+    values.extend(
+        penalty.player_external_id
+        for penalty in record.penalties
+        if penalty.player_external_id is not None
+    )
+    return tuple(values)
+
+
+def _ensure_validation_player_ids(
+    game_id: str,
+    record: NflversePlayRecord,
+    player_ids: dict[str, PlayerId],
+) -> None:
+    """Allocate opaque in-memory IDs only to exercise normalization contracts."""
+
+    for external_id in _provider_player_ids(record):
+        if external_id not in player_ids:
+            ordinal = len(player_ids) + 1
+            player_ids[external_id] = PlayerId(f"m6b_ply_{game_id}_{ordinal:03d}")
+
+
+def _reject_sample(row: dict[str, object], raw_index: int) -> dict[str, object]:
     keys = (
         "game_id",
         "play_id",
@@ -77,7 +110,9 @@ def _reject_sample(row: dict[str, object]) -> dict[str, object]:
         "timeout",
         "quarter_end",
     )
-    return {key: row.get(key) for key in keys}
+    sample = {key: row.get(key) for key in keys}
+    sample["raw_row_index"] = raw_index
+    return sample
 
 
 def main() -> int:
@@ -92,24 +127,28 @@ def main() -> int:
     taxonomy: Counter[str] = Counter()
     extracted_by_game: dict[str, list[ExtractedRow]] = defaultdict(list)
     context_by_game: dict[str, NflverseGameContext] = {}
+    player_ids_by_game: dict[str, dict[str, PlayerId]] = defaultdict(dict)
     sequence_by_game: Counter[str] = Counter()
     possession_by_game: Counter[str] = Counter()
     last_offense_by_game: dict[str, str | None] = {}
     drive_maps: dict[str, dict[str, int]] = defaultdict(dict)
     representative: dict[str, dict[str, object]] = {}
 
-    for raw_row in frame.to_dicts():
+    for raw_index, raw_row in enumerate(frame.to_dicts()):
         row = dict(raw_row)
         try:
-            record = extract_nflverse_play_record(row)
-            context = _record_context(row, record)
+            extracted = extract_nflverse_play_record(row)
+            record = replace(extracted, source_row_index=raw_index)
+            player_ids = player_ids_by_game[record.provider_game_id]
+            _ensure_validation_player_ids(record.provider_game_id, record, player_ids)
+            context = _record_context(row, record, player_ids)
         except (TypeError, ValueError) as exc:
             reason = str(exc)
             extraction_errors[reason] += 1
             play_type = str(row.get("play_type") or "<NULL>")
             extraction_error_play_types[reason][play_type] += 1
             if len(extraction_error_samples[reason]) < 5:
-                extraction_error_samples[reason].append(_reject_sample(row))
+                extraction_error_samples[reason].append(_reject_sample(row, raw_index))
             continue
 
         game_id = record.provider_game_id
@@ -150,9 +189,11 @@ def main() -> int:
                 "game_id": game_id,
                 "provider_play_id": record.provider_play_id,
                 "provider_drive_id": record.provider_drive_id,
+                "raw_row_index": raw_index,
                 "description": record.description,
                 "semantic_label": bundle.execution.semantic_label,
                 "no_play": bundle.result.no_play,
+                "participation_count": len(bundle.participation),
             },
         )
         extracted_by_game[game_id].append(
@@ -166,11 +207,19 @@ def main() -> int:
 
     next_state_errors: Counter[str] = Counter()
     next_state_validated = 0
-    sample_game_id = next(iter(extracted_by_game), None)
-    if sample_game_id is not None:
-        items = extracted_by_game[sample_game_id]
-        context = context_by_game[sample_game_id]
+    next_state_nonadjacent_skipped = 0
+    for game_id, items in extracted_by_game.items():
+        context = context_by_game[game_id]
         for current, following in zip(items, items[1:], strict=False):
+            current_index = current.record.source_row_index
+            following_index = following.record.source_row_index
+            if (
+                current_index is None
+                or following_index is None
+                or following_index != current_index + 1
+            ):
+                next_state_nonadjacent_skipped += 1
+                continue
             try:
                 normalize_nflverse_play(
                     current.record,
@@ -204,8 +253,8 @@ def main() -> int:
         "normalization_errors": dict(normalization_errors.most_common()),
         "canonical_play_type_counts": dict(sorted(taxonomy.items())),
         "representative_normalized_rows": representative,
-        "sample_game_id": sample_game_id,
-        "next_state_validated": next_state_validated,
+        "next_state_adjacent_validated": next_state_validated,
+        "next_state_nonadjacent_skipped": next_state_nonadjacent_skipped,
         "next_state_error_count": sum(next_state_errors.values()),
         "next_state_errors": dict(next_state_errors.most_common()),
     }
@@ -222,8 +271,8 @@ def main() -> int:
         "normalization_error_count": result["normalization_error_count"],
         "canonical_play_type_counts": result["canonical_play_type_counts"],
         "extraction_error_play_types": result["extraction_error_play_types"],
-        "sample_game_id": sample_game_id,
-        "next_state_validated": next_state_validated,
+        "next_state_adjacent_validated": next_state_validated,
+        "next_state_nonadjacent_skipped": next_state_nonadjacent_skipped,
         "next_state_error_count": result["next_state_error_count"],
         "output": str(output),
     }

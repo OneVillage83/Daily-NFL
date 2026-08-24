@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from daily_nfl.domain import (
     ObservedPhysicalOutcome,
+    Participation,
     Penalty,
     Period,
     PlayDesignModifier,
@@ -24,6 +25,7 @@ from daily_nfl.normalization.contracts import (
 )
 from daily_nfl.reconciliation import (
     drive_id_for,
+    participation_id_for,
     penalty_id_for,
     play_event_id_for,
     play_id_for,
@@ -90,16 +92,19 @@ def _modifiers(
 
     modifiers: set[PlayDesignModifier] = set()
     for enabled, modifier in (
-        (record.play_action, PlayDesignModifier.PLAY_ACTION),
-        (record.rpo and play_type in {PlayType.PASS, PlayType.RUSH}, PlayDesignModifier.RPO),
-        (record.screen, PlayDesignModifier.SCREEN),
-        (record.shotgun, PlayDesignModifier.SHOTGUN),
-        (record.under_center, PlayDesignModifier.UNDER_CENTER),
-        (record.motion, PlayDesignModifier.MOTION),
-        (record.shift, PlayDesignModifier.SHIFT),
-        (record.no_huddle, PlayDesignModifier.NO_HUDDLE),
+        (record.play_action is True, PlayDesignModifier.PLAY_ACTION),
         (
-            record.designed_qb_run and play_type is PlayType.RUSH,
+            record.rpo is True and play_type in {PlayType.PASS, PlayType.RUSH},
+            PlayDesignModifier.RPO,
+        ),
+        (record.screen is True, PlayDesignModifier.SCREEN),
+        (record.shotgun is True, PlayDesignModifier.SHOTGUN),
+        (record.under_center is True, PlayDesignModifier.UNDER_CENTER),
+        (record.motion is True, PlayDesignModifier.MOTION),
+        (record.shift is True, PlayDesignModifier.SHIFT),
+        (record.no_huddle is True, PlayDesignModifier.NO_HUDDLE),
+        (
+            record.designed_qb_run is True and play_type is PlayType.RUSH,
             PlayDesignModifier.DESIGNED_QB_RUN,
         ),
     ):
@@ -139,14 +144,66 @@ def _require_possession_codes(record: NflversePlayRecord) -> tuple[str, str]:
     return offense, defense
 
 
+def _validate_next_record_adjacency(
+    record: NflversePlayRecord,
+    next_record: NflversePlayRecord,
+) -> None:
+    if next_record.provider_game_id != record.provider_game_id:
+        raise PlayNormalizationError("next_record must belong to the same provider game")
+    if record.source_row_index is None or next_record.source_row_index is None:
+        raise PlayNormalizationError(
+            "PLAY_STATE_AFTER requires explicit raw source-row adjacency metadata"
+        )
+    if next_record.source_row_index != record.source_row_index + 1:
+        raise PlayNormalizationError(
+            "PLAY_STATE_AFTER cannot skip intervening raw provider rows"
+        )
+
+
+def _build_participation(
+    *,
+    record: NflversePlayRecord,
+    context: NflverseGameContext,
+    play_id: PlayId,
+) -> tuple[Participation, ...]:
+    participation: list[Participation] = []
+    for sequence, item in enumerate(record.participants, start=1):
+        player_id = context.player_id_for_external(item.player_external_id)
+        if player_id is None:
+            raise PlayNormalizationError(
+                "provider participant identity is unresolved: "
+                f"{item.player_external_id!r}"
+            )
+        participation.append(
+            Participation(
+                participation_id=participation_id_for(play_id, sequence),
+                play_id=play_id,
+                player_id=player_id,
+                team_season_id=context.team_id_for_code(item.team_code),
+                side=item.side,
+                role=item.role,
+                on_field=item.on_field,
+            )
+        )
+    return tuple(participation)
+
+
+def _participant_for_role(
+    participation: tuple[Participation, ...],
+    role: str,
+) -> Participation | None:
+    return next((item for item in participation if item.role == role), None)
+
+
 def _build_events(
     *,
     record: NflversePlayRecord,
     play_id: PlayId,
     play_type: PlayType,
     score_change: int,
+    participation: tuple[Participation, ...],
 ) -> tuple[PlayEvent, ...]:
-    event_specs: list[tuple[PlayEventType, str | None]] = []
+    event_specs: list[tuple[PlayEventType, Participation | None, str | None]] = []
     if play_type in {
         PlayType.PASS,
         PlayType.RUSH,
@@ -155,29 +212,44 @@ def _build_events(
         PlayType.KNEEL,
         PlayType.SPIKE,
     }:
-        event_specs.append((PlayEventType.SNAP, None))
+        event_specs.append((PlayEventType.SNAP, None, None))
     if play_type is PlayType.PASS:
-        event_specs.append((PlayEventType.THROW, None))
-    if record.complete_pass:
-        event_specs.append((PlayEventType.CATCH, None))
+        passer = _participant_for_role(participation, "passer")
+        event_specs.append((PlayEventType.THROW, passer, None))
+        target = _participant_for_role(participation, "target")
+        if target is not None:
+            event_specs.append((PlayEventType.TARGET, target, None))
+    if record.complete_pass is True:
+        target = _participant_for_role(participation, "target")
+        event_specs.append((PlayEventType.CATCH, target, None))
     if play_type is PlayType.SACK:
-        event_specs.append((PlayEventType.SACK, None))
+        event_specs.append((PlayEventType.SACK, None, None))
     if record.interception:
-        event_specs.append((PlayEventType.INTERCEPTION, None))
+        event_specs.append(
+            (
+                PlayEventType.INTERCEPTION,
+                _participant_for_role(participation, "interceptor"),
+                None,
+            )
+        )
     if record.fumble:
-        event_specs.append((PlayEventType.FUMBLE, None))
+        event_specs.append((PlayEventType.FUMBLE, None, None))
     if play_type in {
         PlayType.PUNT,
         PlayType.FIELD_GOAL,
         PlayType.KICKOFF,
         PlayType.EXTRA_POINT,
     }:
-        event_specs.append((PlayEventType.KICK, None))
+        kicker = _participant_for_role(participation, "kicker")
+        if play_type is PlayType.PUNT:
+            kicker = _participant_for_role(participation, "punter")
+        event_specs.append((PlayEventType.KICK, kicker, None))
     event_specs.extend(
-        (PlayEventType.PENALTY, penalty.penalty_type) for penalty in record.penalties
+        (PlayEventType.PENALTY, None, penalty.penalty_type)
+        for penalty in record.penalties
     )
     if score_change > 0 or record.touchdown or record.safety:
-        event_specs.append((PlayEventType.SCORE, None))
+        event_specs.append((PlayEventType.SCORE, None, None))
 
     return tuple(
         PlayEvent(
@@ -185,9 +257,13 @@ def _build_events(
             play_id=play_id,
             sequence=sequence,
             event_type=event_type,
+            player_id=participant.player_id if participant is not None else None,
+            team_season_id=(
+                participant.team_season_id if participant is not None else None
+            ),
             detail=detail,
         )
-        for sequence, (event_type, detail) in enumerate(event_specs, start=1)
+        for sequence, (event_type, participant, detail) in enumerate(event_specs, start=1)
     )
 
 
@@ -208,13 +284,18 @@ def normalize_nflverse_play(
         raise ValueError("canonical play and possession sequences must be positive")
     if drive_sequence is not None and drive_sequence < 1:
         raise ValueError("drive_sequence must be positive when present")
-    if next_record is not None and next_record.provider_game_id != record.provider_game_id:
-        raise PlayNormalizationError("next_record must belong to the same provider game")
+    if next_record is not None:
+        _validate_next_record_adjacency(record, next_record)
 
     offense_code, defense_code = _require_possession_codes(record)
     offense_id = context.team_id_for_code(offense_code)
     defense_id = context.team_id_for_code(defense_code)
     play_id = play_id_for(context.game_id, canonical_sequence)
+    previous_play_id = (
+        play_id_for(context.game_id, canonical_sequence - 1)
+        if canonical_sequence > 1
+        else None
+    )
     drive_id = (
         drive_id_for(context.game_id, drive_sequence) if drive_sequence is not None else None
     )
@@ -241,12 +322,22 @@ def normalize_nflverse_play(
             context.game_id,
             possession_sequence,
         ),
+        previous_play_id=previous_play_id,
+        motion=record.motion,
+        shift=record.shift,
+        shotgun=record.shotgun,
+        no_huddle=record.no_huddle,
     )
 
     play_type = classify_play_type(record)
     execution = PlayExecution(
         primary_play_type=play_type,
         modifiers=_modifiers(record, play_type),
+    )
+    participation = _build_participation(
+        record=record,
+        context=context,
+        play_id=play_id,
     )
     score_change = _score_change(record, next_record)
 
@@ -307,26 +398,37 @@ def normalize_nflverse_play(
         no_play=record.no_play,
         physical_outcome=physical_outcome,
     )
-    penalties = tuple(
-        Penalty(
-            penalty_id=penalty_id_for(play_id, sequence),
-            play_id=play_id,
-            team_season_id=context.team_id_for_code(penalty.team_code),
-            penalty_type=penalty.penalty_type,
-            disposition=penalty.disposition,
-            yards=penalty.yards,
-            automatic_first_down=penalty.automatic_first_down,
-            loss_of_down=penalty.loss_of_down,
-            nullifies_play=penalty.nullifies_play,
-            enforcement_spot=penalty.enforcement_spot,
+    penalties: list[Penalty] = []
+    for sequence, penalty in enumerate(record.penalties, start=1):
+        player_id = None
+        if penalty.player_external_id is not None:
+            player_id = context.player_id_for_external(penalty.player_external_id)
+            if player_id is None:
+                raise PlayNormalizationError(
+                    "penalty player identity is unresolved: "
+                    f"{penalty.player_external_id!r}"
+                )
+        penalties.append(
+            Penalty(
+                penalty_id=penalty_id_for(play_id, sequence),
+                play_id=play_id,
+                team_season_id=context.team_id_for_code(penalty.team_code),
+                player_id=player_id,
+                penalty_type=penalty.penalty_type,
+                disposition=penalty.disposition,
+                yards=penalty.yards,
+                automatic_first_down=penalty.automatic_first_down,
+                loss_of_down=penalty.loss_of_down,
+                nullifies_play=penalty.nullifies_play,
+                enforcement_spot=penalty.enforcement_spot,
+            )
         )
-        for sequence, penalty in enumerate(record.penalties, start=1)
-    )
     events = _build_events(
         record=record,
         play_id=play_id,
         play_type=play_type,
         score_change=score_change,
+        participation=participation,
     )
 
     return NormalizedPlayBundle(
@@ -340,8 +442,8 @@ def normalize_nflverse_play(
         pre_play_state=pre_state,
         execution=execution,
         events=events,
-        participation=(),
-        penalties=penalties,
+        participation=participation,
+        penalties=tuple(penalties),
         result=result,
         state_after=state_after,
         description=record.description,

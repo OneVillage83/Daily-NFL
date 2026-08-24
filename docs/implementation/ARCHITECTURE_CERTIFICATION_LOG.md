@@ -40,9 +40,9 @@ M2  Persistence & Migration Foundation                 ARCHITECTURE-CERTIFIED
 M3  Raw Evidence & Provider Abstraction                ARCHITECTURE-CERTIFIED
 M4  Identity & Reconciliation Engine                   ARCHITECTURE-CERTIFIED
 M5  Historical PIT Engine                              ARCHITECTURE-CERTIFIED
-M6  Canonical Play / Drive Normalization               PROVISIONAL — AUDIT NEXT
-M6B Real nflverse PBP Validation                       COMPLETED IN SUBSTANCE / NOT A SUBSTITUTE FOR M6 CERTIFICATION
-M6C Controlled historical continuation                NOT STARTED
+M6  Canonical Play / Drive Normalization               ARCHITECTURE-CERTIFIED
+M6B Real nflverse PBP Validation                       COMPLETED / CORRECTED EVIDENCE INCORPORATED INTO M6 CERTIFICATION
+M6C Controlled historical continuation                NOT STARTED — NEXT CHECKPOINT
 M7  State Engine V1                                    NOT STARTED
 ```
 
@@ -443,11 +443,117 @@ Documentation/status commits after `d553c3a46b36478b069eae97b7b52f283c97b47a` do
 
 ---
 
-## Next Certification Target
+## 2026-08-23 — M6 Certified
+
+**Milestone:** Canonical Play / Drive Normalization  
+**Architecture:** F-5 — Canonical Play / Event / Possession / Drive Architecture  
+**Validated executable code head:** `5f1e2efe115c8f889d99eb7f6169050ee90c8ca7`
+
+Material architecture corrections included:
+
+- raw provider row index retained so `PLAY_STATE_AFTER` can only use the literally adjacent row;
+- cross-game, missing-adjacency, and skipped-row next-state reconstruction fails closed;
+- tri-state charting semantics preserve unknown-vs-explicit-false distinctions;
+- structured nflverse participant roles mapped only through reconciled canonical PlayerIds;
+- unresolved participant and penalty-player identities fail closed rather than leaking provider IDs into canonical identity;
+- ordered event streams now attach canonical passer/target/interceptor/kicker identity when supported;
+- deterministic canonical drive normalization with validated game/drive/possession-segment boundaries;
+- M3/M5 raw content plus acquisition-observation provenance required for normalized writes;
+- normalized observation identity distinguishes repeated acquisitions of identical raw content and is enforced at write time;
+- exact raw observation/provider identity checked before canonical writes;
+- canonical play/participation/penalty persistence made atomic with a SQLite savepoint;
+- idempotent replay compares exact participation/penalty child sets and rejects extra children;
+- historical direct persistence path closed as a bypass and redirected to the certified writer;
+- provider-shaped play/drive IDs, free-text description, and extraction flags removed from downstream canonical JSON;
+- deterministic no-network F-5 validator added;
+- real 2025 nflverse validator corrected to prove raw-row adjacency rather than adjacency among surviving extracted rows.
+
+Final exact-head quality gate:
 
 ```text
-M6 — Canonical Play / Drive Normalization
-Primary architecture dependency: F-5 through F-9 football-state architecture, plus certified M0-M5 foundations
+Python 3.12.10
+E:\Daily-NFL\.venv\Scripts\python.exe
+targeted persistence regressions: 5 passed in 0.50s
+Ruff: All checks passed!
+mypy: Success: no issues found in 89 source files
+pytest: 171 passed in 3.93s
+git status --short: clean
 ```
 
-The earlier M6/M6B implementation and real nflverse PBP work remain valuable provisional evidence, but they do not replace the formal M6 architecture audit/certification. M6 must consume the certified M0-M5 contracts without silently redefining them.
+SQLite gate:
+
+```text
+fresh DB: schema 0 -> 7
+foreign_keys_enabled: true
+integrity_ok: true
+mode: migrate
+
+check DB: schema 7 -> 7
+foreign_keys_enabled: true
+integrity_ok: true
+mode: check
+```
+
+Deterministic F-5 gate:
+
+```text
+primary_play_type: PASS
+semantic_label: PLAY_ACTION_PASS
+event_types: SNAP, THROW, TARGET, CATCH, PENALTY
+participation_count: 2
+penalty_count: 1
+state_after_present: true
+state_after_drive_continues: true
+drive_play_count: 2
+drive_first_downs: 1
+raw evidence identity: retained
+acquisition-observation identity: retained
+payload SHA match: PASS
+payload_is_provider_neutral: true
+nonadjacent_state_after_fail_closed: true
+bad_provenance_fail_closed: true
+bad_provenance_atomic: true
+deterministic observation identity: PASS
+exact idempotent child membership: PASS
+```
+
+Corrected real nflverse 2025 PBP gate:
+
+```text
+nflreadpy_version: 0.1.5
+row_count: 48,771
+extracted_and_normalized_count: 45,196
+extraction_error_count: 3,575
+normalization_error_count: 0
+next_state_adjacent_validated: 41,975
+next_state_nonadjacent_skipped: 2,936
+next_state_error_count: 0
+```
+
+All strict extraction exclusions were confined to `<NULL>` / `no_play` provider rows whose causal pre-play score, quarter clock, or yardline could not be defensibly reconstructed. No successfully extracted state-bearing play failed canonical normalization.
+
+The corrected 41,975-transition adjacency proof supersedes the historical M6B `173 validated / 0 failures` state-after check for certification purposes. The 2,936 skipped pairs are positive fail-closed evidence: an intervening raw row existed, so the validator refused to bridge it.
+
+Evidence:
+
+- `docs/implementation/M6_ARCHITECTURE_CONFORMANCE_AUDIT.md`
+- `docs/implementation/M6_LOCAL_VALIDATION_20260823.md`
+
+Final state:
+
+```text
+M6 — ARCHITECTURE-CERTIFIED
+```
+
+Documentation/status commits after `5f1e2efe115c8f889d99eb7f6169050ee90c8ca7` do not alter the executable behavior that was validated. If later evidence reveals an M6/F-5 defect, M6 must be explicitly reopened and recertified.
+
+---
+
+## Next Checkpoint
+
+```text
+M6C — Controlled historical continuation / full historical checkpoint
+Dependencies: certified M0-M6 foundations
+```
+
+M6C may now consume the certified M6 canonical play/drive contract. It must not silently broaden into F-6 through F-9 state-engine certification; TeamState, PlayerState, UnitState, and CoachingState remain M7 architecture work.

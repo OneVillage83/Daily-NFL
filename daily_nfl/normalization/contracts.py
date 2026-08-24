@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 
 from daily_nfl.domain import (
     GameId,
     Participation,
+    ParticipationSide,
     Penalty,
     PenaltyDisposition,
+    PlayerId,
     PlayEvent,
     PlayExecution,
     PlayResult,
@@ -44,11 +47,32 @@ class ProviderPenaltyRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class ProviderParticipantRecord:
+    """Explicit provider participant fact awaiting canonical player reconciliation."""
+
+    player_external_id: str
+    team_code: str
+    side: ParticipationSide
+    role: str
+    on_field: bool = True
+
+    def __post_init__(self) -> None:
+        if not self.player_external_id.strip():
+            raise ValueError("participant player_external_id cannot be blank")
+        if not self.team_code.strip():
+            raise ValueError("participant team_code cannot be blank")
+        if not self.role.strip():
+            raise ValueError("participant role cannot be blank")
+
+
+@dataclass(frozen=True, slots=True)
 class NflversePlayRecord:
     """Small semantic subset extracted from one nflverse PBP row.
 
     The full upstream row remains in immutable raw evidence. This contract only
-    carries fields needed to construct canonical football state in M6.
+    carries fields needed to construct canonical football state in M6. Optional
+    charting flags use ``None`` when the provider did not observe/expose the
+    concept; unknown must never be rewritten as a false football fact.
     """
 
     provider_game_id: str
@@ -63,6 +87,7 @@ class NflversePlayRecord:
     yards_to_goal: int
     home_score_before: int
     away_score_before: int
+    source_row_index: int | None = None
     home_score_after: int | None = None
     away_score_after: int | None = None
     home_timeouts_remaining: int | None = None
@@ -92,15 +117,16 @@ class NflversePlayRecord:
     two_point_attempt: bool = False
     timeout: bool = False
     administrative: bool = False
-    play_action: bool = False
-    rpo: bool = False
-    screen: bool = False
-    shotgun: bool = False
-    under_center: bool = False
-    motion: bool = False
-    shift: bool = False
-    no_huddle: bool = False
-    designed_qb_run: bool = False
+    play_action: bool | None = None
+    rpo: bool | None = None
+    screen: bool | None = None
+    shotgun: bool | None = None
+    under_center: bool | None = None
+    motion: bool | None = None
+    shift: bool | None = None
+    no_huddle: bool | None = None
+    designed_qb_run: bool | None = None
+    participants: tuple[ProviderParticipantRecord, ...] = field(default_factory=tuple)
     penalties: tuple[ProviderPenaltyRecord, ...] = field(default_factory=tuple)
 
     def __post_init__(self) -> None:
@@ -112,6 +138,8 @@ class NflversePlayRecord:
                 raise ValueError(f"{label} cannot be blank")
         if self.provider_drive_id is not None and not self.provider_drive_id.strip():
             raise ValueError("provider_drive_id cannot be blank when present")
+        if self.source_row_index is not None and self.source_row_index < 0:
+            raise ValueError("source_row_index cannot be negative")
         if self.period < 1:
             raise ValueError("period must be positive")
         if self.quarter_seconds_remaining < 0:
@@ -136,6 +164,7 @@ class NflverseGameContext:
     away_team_code: str
     home_team_season_id: TeamSeasonId
     away_team_season_id: TeamSeasonId
+    player_ids_by_external_id: Mapping[str, PlayerId] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not self.home_team_code.strip() or not self.away_team_code.strip():
@@ -144,6 +173,8 @@ class NflverseGameContext:
             raise ValueError("home and away team codes must differ")
         if self.home_team_season_id == self.away_team_season_id:
             raise ValueError("home and away canonical teams must differ")
+        if any(not external_id.strip() for external_id in self.player_ids_by_external_id):
+            raise ValueError("player external IDs cannot be blank")
 
     def team_id_for_code(self, team_code: str) -> TeamSeasonId:
         if team_code == self.home_team_code:
@@ -151,6 +182,9 @@ class NflverseGameContext:
         if team_code == self.away_team_code:
             return self.away_team_season_id
         raise ValueError(f"team code {team_code!r} is not part of canonical game")
+
+    def player_id_for_external(self, external_id: str) -> PlayerId | None:
+        return self.player_ids_by_external_id.get(external_id)
 
 
 @dataclass(frozen=True, slots=True)

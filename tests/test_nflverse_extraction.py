@@ -1,6 +1,6 @@
 import pytest
 
-from daily_nfl.domain import PenaltyDisposition
+from daily_nfl.domain import ParticipationSide, PenaltyDisposition
 from daily_nfl.normalization import NflverseRowExtractionError, extract_nflverse_play_record
 
 
@@ -48,7 +48,7 @@ def test_extracts_scores_in_home_away_orientation() -> None:
     assert (record.home_score_before, record.away_score_before) == (10, 7)
     assert (record.home_score_after, record.away_score_after) == (10, 14)
     assert record.official_yards_gained == 12
-    assert record.shotgun
+    assert record.shotgun is True
 
 
 def test_no_play_comes_from_play_type() -> None:
@@ -71,14 +71,28 @@ def test_no_play_comes_from_play_type() -> None:
     assert record.penalties[0].nullifies_play
 
 
-def test_base_pbp_does_not_infer_ftn_modifiers() -> None:
+def test_base_pbp_preserves_unavailable_charting_as_unknown() -> None:
     record = extract_nflverse_play_record(_row())
-    assert not record.play_action
-    assert not record.rpo
-    assert not record.screen
-    assert not record.motion
-    assert not record.shift
-    assert not record.designed_qb_run
+    assert record.play_action is None
+    assert record.rpo is None
+    assert record.screen is None
+    assert record.motion is None
+    assert record.shift is None
+    assert record.designed_qb_run is None
+    assert record.under_center is None
+
+
+def test_explicit_provider_participants_are_extracted_without_name_guessing() -> None:
+    record = extract_nflverse_play_record(
+        _row(
+            passer_player_id="00-0030001",
+            receiver_player_id="00-0030002",
+        )
+    )
+    assert [(item.player_external_id, item.side, item.role) for item in record.participants] == [
+        ("00-0030001", ParticipationSide.OFFENSE, "passer"),
+        ("00-0030002", ParticipationSide.OFFENSE, "target"),
+    ]
 
 
 def test_negative_timeout_sentinel_becomes_unknown() -> None:
