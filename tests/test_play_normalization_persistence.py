@@ -23,8 +23,8 @@ from daily_nfl.normalization import (
 )
 from daily_nfl.persistence import apply_migrations, open_database
 from daily_nfl.providers import (
-    DatasetKind,
     NFLVERSE_DESCRIPTOR,
+    DatasetKind,
     record_provider,
     record_provider_capability,
 )
@@ -133,6 +133,12 @@ def _knowledge(offset_seconds: int = 0) -> KnowledgeTimestamp:
     )
 
 
+def _required_iso(value: datetime | None, label: str) -> str:
+    if value is None:
+        raise AssertionError(f"fixture knowledge requires {label}")
+    return value.isoformat()
+
+
 def _seed_raw_acquisition(connection: sqlite3.Connection) -> None:
     record_provider(connection, NFLVERSE_DESCRIPTOR)
     capability = NFLVERSE_DESCRIPTOR.capability_for(DatasetKind.PLAY_BY_PLAY)
@@ -170,8 +176,8 @@ def _seed_raw_acquisition(connection: sqlite3.Connection) -> None:
             "application/octet-stream",
             RAW_SHA256,
             "fixture/m6-pbp.bin",
-            knowledge.observed_at.isoformat(),
-            knowledge.ingested_at.isoformat(),
+            _required_iso(knowledge.observed_at, "observed_at"),
+            _required_iso(knowledge.ingested_at, "ingested_at"),
             knowledge.available_at.isoformat(),
             knowledge.availability_method.value,
             knowledge.availability_confidence.value,
@@ -208,8 +214,8 @@ def _seed_raw_acquisition(connection: sqlite3.Connection) -> None:
             DatasetKind.PLAY_BY_PLAY.value,
             capability_id,
             "fixture://m6/pbp",
-            knowledge.observed_at.isoformat(),
-            knowledge.ingested_at.isoformat(),
+            _required_iso(knowledge.observed_at, "observed_at"),
+            _required_iso(knowledge.ingested_at, "ingested_at"),
             knowledge.available_at.isoformat(),
             knowledge.availability_method.value,
             knowledge.availability_confidence.value,
@@ -223,7 +229,12 @@ def _seed_raw_acquisition(connection: sqlite3.Connection) -> None:
     )
 
 
-def _provenance(*, observation_id: str, offset_seconds: int = 0, revision: str) -> NormalizationProvenance:
+def _provenance(
+    *,
+    observation_id: str,
+    offset_seconds: int = 0,
+    revision: str,
+) -> NormalizationProvenance:
     return NormalizationProvenance(
         observation_id=observation_id,
         knowledge=_knowledge(offset_seconds),
