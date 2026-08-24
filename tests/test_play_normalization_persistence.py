@@ -229,17 +229,39 @@ def _seed_raw_acquisition(connection: sqlite3.Connection) -> None:
     )
 
 
+def _observation_id(
+    *,
+    revision: str,
+    evidence_observation_id: str = EVIDENCE_OBSERVATION_ID,
+) -> str:
+    return normalized_play_observation_id(
+        evidence_id=EVIDENCE_ID,
+        evidence_observation_id=evidence_observation_id,
+        provider_id="nflverse",
+        provider_play_id="100",
+        provider_revision=revision,
+    )
+
+
 def _provenance(
     *,
-    observation_id: str,
-    offset_seconds: int = 0,
     revision: str,
+    observation_id: str | None = None,
+    evidence_observation_id: str = EVIDENCE_OBSERVATION_ID,
+    offset_seconds: int = 0,
 ) -> NormalizationProvenance:
     return NormalizationProvenance(
-        observation_id=observation_id,
+        observation_id=(
+            observation_id
+            if observation_id is not None
+            else _observation_id(
+                revision=revision,
+                evidence_observation_id=evidence_observation_id,
+            )
+        ),
         knowledge=_knowledge(offset_seconds),
         evidence_id=EVIDENCE_ID,
-        evidence_observation_id=EVIDENCE_OBSERVATION_ID,
+        evidence_observation_id=evidence_observation_id,
         provider_revision=revision,
     )
 
@@ -258,14 +280,8 @@ def test_normalized_play_persistence_is_idempotent_and_provider_neutral(tmp_path
             drive_sequence=1,
             possession_sequence=1,
         )
-        observation_id = normalized_play_observation_id(
-            evidence_id=EVIDENCE_ID,
-            evidence_observation_id=EVIDENCE_OBSERVATION_ID,
-            provider_id="nflverse",
-            provider_play_id="100",
-            provider_revision="r1",
-        )
-        provenance = _provenance(observation_id=observation_id, revision="r1")
+        provenance = _provenance(revision="r1")
+        observation_id = provenance.observation_id
 
         record_normalized_play(connection, bundle, provenance)
         record_normalized_play(connection, bundle, provenance)
@@ -299,6 +315,7 @@ def test_normalized_play_persistence_is_idempotent_and_provider_neutral(tmp_path
             """
         ).fetchone()
 
+    assert observation_id == _observation_id(revision="r1")
     assert row is not None
     assert row[0] == str(play_id_for(context.game_id, 1))
     assert row[1] == EVIDENCE_OBSERVATION_ID
@@ -341,14 +358,10 @@ def test_provider_revision_adds_observation_without_replacing_canonical_play(
             drive_sequence=1,
             possession_sequence=1,
         )
-        first_provenance = _provenance(
-            observation_id="pob_revision_1",
-            revision="r1",
-        )
+        first_provenance = _provenance(revision="r1")
         corrected_provenance = _provenance(
-            observation_id="pob_revision_2",
-            offset_seconds=30,
             revision="r2",
+            offset_seconds=30,
         )
 
         record_normalized_play(connection, first, first_provenance)
@@ -376,6 +389,82 @@ def test_provider_revision_adds_observation_without_replacing_canonical_play(
     assert yards == [9, 11]
 
 
+def test_arbitrary_observation_identity_fails_before_canonical_play_survives(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "m6-bad-observation-id.db"
+
+    with open_database(database) as connection:
+        apply_migrations(connection)
+        _seed_raw_acquisition(connection)
+        context = _context_and_game(connection)
+        bundle = normalize_nflverse_play(
+            _record(yards=12),
+            context=context,
+            canonical_sequence=1,
+            drive_sequence=1,
+            possession_sequence=1,
+        )
+        bad = _provenance(
+            revision="r1",
+            observation_id="pob_arbitrary",
+        )
+
+        with pytest.raises(
+            NormalizedPlayConflictError,
+            match="deterministic provenance identity",
+        ):
+            record_normalized_play(connection, bundle, bad)
+
+        assert connection.execute("SELECT COUNT(*) FROM plays").fetchone()[0] == 0
+        assert connection.execute("SELECT COUNT(*) FROM play_observations").fetchone()[0] == 0
+
+
+def test_idempotent_replay_rejects_extra_child_membership(tmp_path: Path) -> None:
+    database = tmp_path / "m6-extra-membership.db"
+
+    with open_database(database) as connection:
+        apply_migrations(connection)
+        _seed_raw_acquisition(connection)
+        context = _context_and_game(connection)
+        bundle = normalize_nflverse_play(
+            _record(yards=12, penalty=True),
+            context=context,
+            canonical_sequence=1,
+            drive_sequence=1,
+            possession_sequence=1,
+        )
+        provenance = _provenance(revision="r1")
+        record_normalized_play(connection, bundle, provenance)
+        connection.execute(
+            """
+            INSERT INTO penalty_observations(
+                observation_id, penalty_id, play_id, team_season_id, player_id,
+                evidence_id, evidence_observation_id, provider_id, penalty_type,
+                disposition, yards, automatic_first_down, loss_of_down,
+                nullifies_play, enforcement_spot, effective_at, published_at,
+                observed_at, ingested_at, available_at, availability_method,
+                availability_confidence, provider_revision
+            )
+            SELECT
+                'peo_extra_membership', penalty_id, play_id, team_season_id, player_id,
+                evidence_id, evidence_observation_id, provider_id, penalty_type,
+                disposition, yards, automatic_first_down, loss_of_down,
+                nullifies_play, enforcement_spot, effective_at, published_at,
+                observed_at, ingested_at, available_at, availability_method,
+                availability_confidence, provider_revision
+            FROM penalty_observations
+            LIMIT 1
+            """
+        )
+
+        with pytest.raises(
+            NormalizedPlayConflictError,
+            match="penalty observation membership is not exact",
+        ):
+            record_normalized_play(connection, bundle, provenance)
+
+
 def test_bad_acquisition_provenance_fails_before_canonical_play_survives(tmp_path: Path) -> None:
     database = tmp_path / "m6-bad-provenance.db"
 
@@ -390,12 +479,9 @@ def test_bad_acquisition_provenance_fails_before_canonical_play_survives(tmp_pat
             drive_sequence=1,
             possession_sequence=1,
         )
-        bad = NormalizationProvenance(
-            observation_id="pob_bad_provenance",
-            knowledge=_knowledge(),
-            evidence_id=EVIDENCE_ID,
+        bad = _provenance(
+            revision="r1",
             evidence_observation_id="reo_missing",
-            provider_revision="r1",
         )
 
         with pytest.raises(NormalizedPlayConflictError, match="exact raw acquisition"):
