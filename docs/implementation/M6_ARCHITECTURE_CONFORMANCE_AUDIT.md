@@ -4,7 +4,7 @@
 **Milestone:** M6 — Canonical Play / Drive Normalization  
 **Architecture dependency:** F-5 — Canonical Play / Event / Possession / Drive Architecture  
 **Certified dependency base:** M0-M5  
-**Validated executable SHA:** `32e2eadd42da9b81a83d81a04eee180ed6b028e7`  
+**Validated executable SHA:** `5f1e2efe115c8f889d99eb7f6169050ee90c8ca7`  
 **Certification status:** **ARCHITECTURE-CERTIFIED**
 
 ---
@@ -55,8 +55,10 @@ The certified boundary requires:
 - possession-segment and drive identity/transition support;
 - append-only provider revisions rather than silent canonical overwrite;
 - M3/M5 raw-content and acquisition-observation provenance on normalized writes;
+- deterministic normalized-observation identity from exact evidence/acquisition/provider/revision facts;
+- exact idempotent child membership, rejecting both missing and extra participation/penalty children;
 - provider-shaped row fields/IDs excluded from the downstream canonical payload;
-- fail-closed behavior when state, identity, sequence, or provenance cannot be defended.
+- fail-closed behavior when state, identity, sequence, provenance, or replay membership cannot be defended.
 
 Derived analytics such as EPA/WPA/success remain outside canonical football truth.
 
@@ -93,17 +95,17 @@ Derived analytics such as EPA/WPA/success remain outside canonical football trut
 | M6-25 | Provider revisions append rather than overwrite | `SATISFIED` | Multiple play observations may reference one canonical play without replacing earlier normalized payloads. |
 | M6-26 | Exact raw content retained | `SATISFIED` | New normalized writes require `evidence_id`. |
 | M6-27 | Exact acquisition observation retained | `SATISFIED AFTER REMEDIATION` | New normalized writes require and persist `evidence_observation_id`. |
-| M6-28 | Observation identity distinguishes repeated acquisitions | `SATISFIED AFTER REMEDIATION` | Normalized observation ID includes both content and acquisition-observation identity. |
+| M6-28 | Observation identity distinguishes repeated acquisitions | `SATISFIED AFTER REMEDIATION` | Normalized observation ID includes content, acquisition-observation, provider row, and revision identity; the writer enforces that derived ID. |
 | M6-29 | Raw observation/provider mismatch fails closed | `SATISFIED AFTER REMEDIATION` | Certified writer verifies the M3 raw-observation ledger before canonical writes. |
 | M6-30 | Normalization persistence atomic | `SATISFIED AFTER REMEDIATION` | Canonical identities + play/participation/penalty observations are protected by one SQLite savepoint. |
-| M6-31 | Idempotent replay verifies child membership | `SATISFIED AFTER REMEDIATION` | Existing observation replay verifies expected participation/penalty observation identity/provenance. |
+| M6-31 | Idempotent replay verifies exact child membership | `SATISFIED AFTER FINAL REMEDIATION` | Existing replay compares the complete expected participation/penalty child sets and rejects missing, mismatched, or extra children. |
 | M6-32 | Provider-shaped row fields excluded downstream | `SATISFIED AFTER REMEDIATION` | Canonical JSON excludes provider IDs, provider drive/play IDs, raw description, and extraction flags. |
 | M6-33 | Complete canonical pre-state/result serialization | `SATISFIED AFTER REMEDIATION` | Serializer retains optional pre-state context, previous play, events, participation, penalties, full physical outcome, and state-after. |
 | M6-34 | Provisional direct persistence path cannot bypass certified writer | `SATISFIED AFTER REMEDIATION` | Historical module delegates writes to certified persistence. |
 | M6-35 | No unnecessary schema migration | `SATISFIED` | M2 canonical ledgers + M5 v7 acquisition columns already satisfy M6 storage needs; migrations 1-7 remain unchanged. |
-| M6-36 | Deterministic no-network M6 validator | `VALIDATED` | Exact-head run exercises execution/events/participation/penalty/state-after/drive/provenance/atomic failure and passed. |
-| M6-37 | Corrected real nflverse season validator | `VALIDATED` | 2025 run validated 41,975 truly adjacent transitions, skipped 2,936 nonadjacent pairs, and recorded 0 state-after errors. |
-| M6-38 | Full repository quality gate | `VALIDATED` | 169 pytest PASS; Ruff PASS; strict mypy PASS on 89 source files; clean exact-head tree. |
+| M6-36 | Deterministic no-network M6 validator | `VALIDATED` | Final exact-head run exercises execution/events/participation/penalty/state-after/drive/provenance/atomic failure and passed. |
+| M6-37 | Corrected real nflverse season validator | `VALIDATED` | Final exact-head 2025 run validated 41,975 truly adjacent transitions, skipped 2,936 nonadjacent pairs, and recorded 0 state-after errors. |
+| M6-38 | Full repository quality gate | `VALIDATED` | 171 pytest PASS; Ruff PASS; strict mypy PASS on 89 source files; clean exact-head tree. |
 | M6-39 | F-6 through F-9 team/player/unit/coaching state | `DEFERRED BY ROADMAP` | These are M7 architecture dependencies, not M6 exit conditions. |
 
 ---
@@ -149,9 +151,10 @@ run fields consistently. A false default conflates "provider observed absent" wi
 The provisional writer could retain `evidence_id` but not the specific M3
 acquisition observation. Certified M6 persistence now requires both, validates the
 exact observation/provider pair, persists it to play/participation/penalty
-observations, and includes acquisition identity in normalized observation identity.
-The deterministic validator proved bad provenance fails before a canonical play can
-survive and rolls back atomically.
+observations, includes acquisition identity in normalized observation identity,
+and enforces the deterministic observation ID at write time. The deterministic
+validator proved bad provenance fails before a canonical play can survive and rolls
+back atomically.
 
 ### F-04 — play participation was always empty
 
@@ -188,6 +191,17 @@ The historical `normalization.persistence` module is now a compatibility boundar
 that requires acquisition-observation provenance and delegates actual writes to
 certified persistence; shared canonical-row helpers live in `persistence_core`.
 
+### F-08 — idempotent replay did not prove exact child membership
+
+**Severity:** HIGH — REMEDIATED AND VALIDATED
+
+Final PR review found that replay proved each expected participation/penalty child
+existed, but did not prove that no extra child was attached to the same normalized
+revision. Certified persistence now compares complete child sets scoped to the
+canonical play, exact acquisition observation, provider, and revision. Dedicated
+regressions prove an extra child fails closed and that arbitrary observation IDs
+cannot bypass deterministic normalized-observation identity.
+
 ---
 
 ## 5. Fail-closed behavior after remediation
@@ -203,7 +217,8 @@ M6 intentionally refuses to guess when:
 - drive bundles span different games, drives, possession segments, or teams;
 - canonical identity collides with different stored facts;
 - normalized acquisition observation does not match raw evidence/provider identity;
-- an existing normalized observation or child membership disagrees with replayed data;
+- supplied normalized observation identity does not match deterministic derivation;
+- an existing normalized observation has missing, mismatched, or extra child membership;
 - a database child/FK write fails inside the atomic savepoint.
 
 Unknown optional charting remains unknown instead of being inferred.
@@ -227,16 +242,17 @@ Unknown optional charting remains unknown instead of being inferred.
 Exact clean executable SHA:
 
 ```text
-32e2eadd42da9b81a83d81a04eee180ed6b028e7
+5f1e2efe115c8f889d99eb7f6169050ee90c8ca7
 ```
 
 Quality and persistence gates:
 
 ```text
 Python 3.12.10 — E:\Daily-NFL\.venv\Scripts\python.exe
+targeted persistence regressions: 5 passed in 0.50s
 Ruff: PASS
 mypy: PASS — 89 source files
-pytest: 169 passed in 4.84s
+pytest: 171 passed in 3.93s
 working tree: clean
 fresh SQLite: 0 -> 7 PASS
 SQLite check: 7 -> 7 PASS
@@ -263,6 +279,13 @@ payload_is_provider_neutral: true
 nonadjacent_state_after_fail_closed: true
 bad_provenance_fail_closed: true
 bad_provenance_atomic: true
+```
+
+Persistence regressions additionally prove:
+
+```text
+deterministic normalized observation ID enforced: PASS
+extra child membership on idempotent replay rejected: PASS
 ```
 
 Corrected real 2025 nflverse gate (`nflreadpy==0.1.5`):
@@ -298,6 +321,8 @@ M6 CANONICAL PARTICIPATION: VALIDATED
 M6 PENALTY PLAYER RECONCILIATION: VALIDATED
 M6 DRIVE NORMALIZATION: VALIDATED
 M6 M3/M5 ACQUISITION PROVENANCE: VALIDATED
+M6 DETERMINISTIC OBSERVATION IDENTITY: VALIDATED
+M6 EXACT IDEMPOTENT CHILD MEMBERSHIP: VALIDATED
 M6 ATOMIC NORMALIZATION PERSISTENCE: VALIDATED
 M6 PROVIDER-NEUTRAL DOWNSTREAM PAYLOAD: VALIDATED
 M6 DIRECT PERSISTENCE BYPASS: CLOSED
@@ -309,6 +334,6 @@ M6 REAL 2025 NFLVERSE GATE: PASS
 M6 ARCHITECTURE CERTIFICATION: ARCHITECTURE-CERTIFIED
 ```
 
-**Final decision: M6 / F-5 is `ARCHITECTURE-CERTIFIED` on executable SHA `32e2eadd42da9b81a83d81a04eee180ed6b028e7`.**
+**Final decision: M6 / F-5 is `ARCHITECTURE-CERTIFIED` on executable SHA `5f1e2efe115c8f889d99eb7f6169050ee90c8ca7`.**
 
 Documentation-only certification commits after that SHA do not alter the executable behavior that was validated. If later evidence reveals an M6/F-5 defect, M6 must be explicitly reopened and recertified.
