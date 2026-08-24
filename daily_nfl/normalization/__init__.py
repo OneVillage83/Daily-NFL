@@ -4,6 +4,7 @@ from daily_nfl.normalization.contracts import (
     NflverseGameContext,
     NflversePlayRecord,
     NormalizedPlayBundle,
+    ProviderParticipantRecord,
     ProviderPenaltyRecord,
 )
 from daily_nfl.normalization.nflverse import (
@@ -31,6 +32,7 @@ __all__ = [
     "NormalizedPlayBundle",
     "NormalizedPlayConflictError",
     "PlayNormalizationError",
+    "ProviderParticipantRecord",
     "ProviderPenaltyRecord",
     "classify_play_type",
     "extract_nflverse_play_record",
