@@ -4,6 +4,8 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import UUID
 
+import pytest
+
 from daily_nfl.domain import (
     AvailabilityConfidence,
     AvailabilityMethod,
@@ -13,13 +15,19 @@ from daily_nfl.normalization import (
     NflverseGameContext,
     NflversePlayRecord,
     NormalizationProvenance,
+    NormalizedPlayConflictError,
     ProviderPenaltyRecord,
     normalize_nflverse_play,
     normalized_play_observation_id,
     record_normalized_play,
 )
 from daily_nfl.persistence import apply_migrations, open_database
-from daily_nfl.providers import NFLVERSE_DESCRIPTOR, record_provider
+from daily_nfl.providers import (
+    DatasetKind,
+    NFLVERSE_DESCRIPTOR,
+    record_provider,
+    record_provider_capability,
+)
 from daily_nfl.reconciliation import (
     IdentityRepository,
     game_id_for_event,
@@ -30,6 +38,9 @@ from daily_nfl.reconciliation import (
 )
 
 COMPETITION_ID = "core-competition-nfl"
+EVIDENCE_ID = "evidence-m6-fixture"
+EVIDENCE_OBSERVATION_ID = "reo_m6_fixture"
+RAW_SHA256 = "a" * 64
 
 
 def _context_and_game(connection: sqlite3.Connection) -> NflverseGameContext:
@@ -98,6 +109,7 @@ def _record(*, yards: int, penalty: bool = False) -> NflversePlayRecord:
         yards_to_goal=75,
         home_score_before=0,
         away_score_before=0,
+        source_row_index=1,
         pass_attempt=True,
         complete_pass=True,
         official_yards_gained=yards,
@@ -121,12 +133,112 @@ def _knowledge(offset_seconds: int = 0) -> KnowledgeTimestamp:
     )
 
 
+def _seed_raw_acquisition(connection: sqlite3.Connection) -> None:
+    record_provider(connection, NFLVERSE_DESCRIPTOR)
+    capability = NFLVERSE_DESCRIPTOR.capability_for(DatasetKind.PLAY_BY_PLAY)
+    assert capability is not None
+    capability_id = record_provider_capability(
+        connection,
+        NFLVERSE_DESCRIPTOR,
+        capability,
+    )
+    knowledge = _knowledge()
+    connection.execute(
+        """
+        INSERT INTO raw_evidence(
+            evidence_id,
+            provider_id,
+            endpoint_category,
+            source_uri,
+            content_type,
+            sha256,
+            object_path,
+            observed_at,
+            ingested_at,
+            available_at,
+            availability_method,
+            availability_confidence,
+            provider_schema_version,
+            parser_version
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            EVIDENCE_ID,
+            "nflverse",
+            DatasetKind.PLAY_BY_PLAY.value,
+            "fixture://m6/pbp",
+            "application/octet-stream",
+            RAW_SHA256,
+            "fixture/m6-pbp.bin",
+            knowledge.observed_at.isoformat(),
+            knowledge.ingested_at.isoformat(),
+            knowledge.available_at.isoformat(),
+            knowledge.availability_method.value,
+            knowledge.availability_confidence.value,
+            capability.schema_version,
+            NFLVERSE_DESCRIPTOR.parser_version,
+        ),
+    )
+    connection.execute(
+        """
+        INSERT INTO raw_evidence_observations(
+            evidence_observation_id,
+            evidence_id,
+            provider_id,
+            dataset,
+            capability_id,
+            source_uri,
+            observed_at,
+            ingested_at,
+            available_at,
+            availability_method,
+            availability_confidence,
+            provider_schema_version,
+            parser_version,
+            license_id,
+            license_url,
+            attribution_required,
+            attribution_text
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            EVIDENCE_OBSERVATION_ID,
+            EVIDENCE_ID,
+            "nflverse",
+            DatasetKind.PLAY_BY_PLAY.value,
+            capability_id,
+            "fixture://m6/pbp",
+            knowledge.observed_at.isoformat(),
+            knowledge.ingested_at.isoformat(),
+            knowledge.available_at.isoformat(),
+            knowledge.availability_method.value,
+            knowledge.availability_confidence.value,
+            capability.schema_version,
+            NFLVERSE_DESCRIPTOR.parser_version,
+            capability.license_id,
+            capability.license_url,
+            int(capability.attribution_required),
+            capability.attribution_text,
+        ),
+    )
+
+
+def _provenance(*, observation_id: str, offset_seconds: int = 0, revision: str) -> NormalizationProvenance:
+    return NormalizationProvenance(
+        observation_id=observation_id,
+        knowledge=_knowledge(offset_seconds),
+        evidence_id=EVIDENCE_ID,
+        evidence_observation_id=EVIDENCE_OBSERVATION_ID,
+        provider_revision=revision,
+    )
+
+
 def test_normalized_play_persistence_is_idempotent_and_provider_neutral(tmp_path: Path) -> None:
     database = tmp_path / "m6.db"
 
     with open_database(database) as connection:
         apply_migrations(connection)
-        record_provider(connection, NFLVERSE_DESCRIPTOR)
+        _seed_raw_acquisition(connection)
         context = _context_and_game(connection)
         bundle = normalize_nflverse_play(
             _record(yards=12, penalty=True),
@@ -136,16 +248,13 @@ def test_normalized_play_persistence_is_idempotent_and_provider_neutral(tmp_path
             possession_sequence=1,
         )
         observation_id = normalized_play_observation_id(
-            evidence_id="evidence-fixture",
+            evidence_id=EVIDENCE_ID,
+            evidence_observation_id=EVIDENCE_OBSERVATION_ID,
             provider_id="nflverse",
             provider_play_id="100",
             provider_revision="r1",
         )
-        provenance = NormalizationProvenance(
-            observation_id=observation_id,
-            knowledge=_knowledge(),
-            provider_revision="r1",
-        )
+        provenance = _provenance(observation_id=observation_id, revision="r1")
 
         record_normalized_play(connection, bundle, provenance)
         record_normalized_play(connection, bundle, provenance)
@@ -159,11 +268,15 @@ def test_normalized_play_persistence_is_idempotent_and_provider_neutral(tmp_path
         assert connection.execute("SELECT COUNT(*) FROM play_observations").fetchone()[0] == 1
         assert connection.execute("SELECT COUNT(*) FROM penalty_observations").fetchone()[0] == 1
         row = connection.execute(
-            "SELECT play_id, normalized_payload_json FROM play_observations"
+            """
+            SELECT play_id, evidence_observation_id, normalized_payload_json
+            FROM play_observations
+            """
         ).fetchone()
         penalty_row = connection.execute(
             """
-            SELECT penalty_id, effective_at, published_at, provider_revision
+            SELECT penalty_id, evidence_observation_id, effective_at,
+                   published_at, provider_revision
             FROM penalty_observations
             """
         ).fetchone()
@@ -177,7 +290,8 @@ def test_normalized_play_persistence_is_idempotent_and_provider_neutral(tmp_path
 
     assert row is not None
     assert row[0] == str(play_id_for(context.game_id, 1))
-    payload = json.loads(str(row[1]))
+    assert row[1] == EVIDENCE_OBSERVATION_ID
+    payload = json.loads(str(row[2]))
     assert payload["contract_version"] == "NFL_CANONICAL_PLAY_V1"
     assert payload["execution"]["primary_play_type"] == "PASS"
     assert payload["pre_play_state"]["possession_segment_id"] is not None
@@ -185,9 +299,10 @@ def test_normalized_play_persistence_is_idempotent_and_provider_neutral(tmp_path
     assert "pass_attempt" not in payload
     assert penalty_row is not None
     assert penalty_row[0] == payload["penalties"][0]["penalty_id"]
-    assert penalty_row[1] == "2026-09-13T18:59:30Z"
-    assert penalty_row[2] == "2026-09-13T18:59:55Z"
-    assert penalty_row[3] == "r1"
+    assert penalty_row[1] == EVIDENCE_OBSERVATION_ID
+    assert penalty_row[2] == "2026-09-13T18:59:30Z"
+    assert penalty_row[3] == "2026-09-13T18:59:55Z"
+    assert penalty_row[4] == "r1"
     assert relation_row is not None
     assert relation_row[0] == relation_row[1]
 
@@ -199,7 +314,7 @@ def test_provider_revision_adds_observation_without_replacing_canonical_play(
 
     with open_database(database) as connection:
         apply_migrations(connection)
-        record_provider(connection, NFLVERSE_DESCRIPTOR)
+        _seed_raw_acquisition(connection)
         context = _context_and_game(connection)
         first = normalize_nflverse_play(
             _record(yards=9),
@@ -215,15 +330,14 @@ def test_provider_revision_adds_observation_without_replacing_canonical_play(
             drive_sequence=1,
             possession_sequence=1,
         )
-        first_provenance = NormalizationProvenance(
+        first_provenance = _provenance(
             observation_id="pob_revision_1",
-            knowledge=_knowledge(),
-            provider_revision="r1",
+            revision="r1",
         )
-        corrected_provenance = NormalizationProvenance(
+        corrected_provenance = _provenance(
             observation_id="pob_revision_2",
-            knowledge=_knowledge(30),
-            provider_revision="r2",
+            offset_seconds=30,
+            revision="r2",
         )
 
         record_normalized_play(connection, first, first_provenance)
@@ -249,3 +363,32 @@ def test_provider_revision_adds_observation_without_replacing_canonical_play(
         for row in observations
     ]
     assert yards == [9, 11]
+
+
+def test_bad_acquisition_provenance_fails_before_canonical_play_survives(tmp_path: Path) -> None:
+    database = tmp_path / "m6-bad-provenance.db"
+
+    with open_database(database) as connection:
+        apply_migrations(connection)
+        _seed_raw_acquisition(connection)
+        context = _context_and_game(connection)
+        bundle = normalize_nflverse_play(
+            _record(yards=12),
+            context=context,
+            canonical_sequence=1,
+            drive_sequence=1,
+            possession_sequence=1,
+        )
+        bad = NormalizationProvenance(
+            observation_id="pob_bad_provenance",
+            knowledge=_knowledge(),
+            evidence_id=EVIDENCE_ID,
+            evidence_observation_id="reo_missing",
+            provider_revision="r1",
+        )
+
+        with pytest.raises(NormalizedPlayConflictError, match="exact raw acquisition"):
+            record_normalized_play(connection, bundle, bad)
+
+        assert connection.execute("SELECT COUNT(*) FROM plays").fetchone()[0] == 0
+        assert connection.execute("SELECT COUNT(*) FROM play_observations").fetchone()[0] == 0
