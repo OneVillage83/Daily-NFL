@@ -6,6 +6,7 @@ import argparse
 import json
 import sqlite3
 import sys
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import UUID
@@ -34,10 +35,7 @@ from daily_nfl.normalization import (  # noqa: E402
     record_normalized_play,
     serialize_normalized_play,
 )
-from daily_nfl.persistence import (  # noqa: E402
-    current_schema_version,
-    open_database,
-)
+from daily_nfl.persistence import current_schema_version, open_database  # noqa: E402
 from daily_nfl.providers import (  # noqa: E402
     DatasetKind,
     NFLVERSE_DESCRIPTOR,
@@ -148,7 +146,7 @@ def _seed_raw_acquisition(connection: sqlite3.Connection) -> None:
     )
 
 
-def _seed_game(connection: sqlite3.Connection) -> tuple[NflverseGameContext, object]:
+def _seed_game(connection: sqlite3.Connection) -> NflverseGameContext:
     repository = IdentityRepository(connection)
     home = new_franchise_id(UUID("11111111-1111-1111-1111-111111111111"))
     away = new_franchise_id(UUID("22222222-2222-2222-2222-222222222222"))
@@ -189,7 +187,7 @@ def _seed_game(connection: sqlite3.Connection) -> tuple[NflverseGameContext, obj
             COMPETITION_ID,
         ),
     )
-    context = NflverseGameContext(
+    return NflverseGameContext(
         game_id=game_id,
         home_team_code="HOM",
         away_team_code="AWY",
@@ -200,7 +198,6 @@ def _seed_game(connection: sqlite3.Connection) -> tuple[NflverseGameContext, obj
             "gsis-target": target,
         },
     )
-    return context, game_id
 
 
 def _first_record() -> NflversePlayRecord:
@@ -273,7 +270,7 @@ def main() -> int:
     with open_database(args.database) as connection:
         schema_version = current_schema_version(connection)
         _seed_raw_acquisition(connection)
-        context, game_id = _seed_game(connection)
+        context = _seed_game(connection)
         first_record = _first_record()
         second_record = _second_record()
 
@@ -334,16 +331,11 @@ def main() -> int:
                 canonical_sequence=1,
                 drive_sequence=1,
                 possession_sequence=1,
-                next_record=NflversePlayRecord(
-                    **{
-                        **second_record.__dict__,
-                        "source_row_index": 12,
-                    }
-                ),
+                next_record=replace(second_record, source_row_index=12),
                 next_drive_sequence=1,
                 next_possession_sequence=1,
             )
-        except (PlayNormalizationError, AttributeError):
+        except PlayNormalizationError:
             nonadjacent_fail_closed = True
 
         bad_provenance_fail_closed = False
@@ -364,9 +356,10 @@ def main() -> int:
             bad_provenance_fail_closed = True
         play_count_after = connection.execute("SELECT COUNT(*) FROM plays").fetchone()[0]
 
+        payload = json.loads(payload_json)
         result = {
             "schema_version": schema_version,
-            "game_id": str(game_id),
+            "game_id": str(context.game_id),
             "primary_play_type": first.execution.primary_play_type.value,
             "semantic_label": first.execution.semantic_label,
             "event_types": [event.event_type.value for event in first.events],
@@ -384,7 +377,16 @@ def main() -> int:
             "provider_id": stored[2],
             "normalized_sha256": stored[3],
             "payload_sha256": payload_sha256,
-            "payload_is_canonical_only": "pass_attempt" not in json.loads(payload_json),
+            "payload_is_provider_neutral": all(
+                key not in payload
+                for key in (
+                    "provider_id",
+                    "provider_play_id",
+                    "provider_drive_id",
+                    "description",
+                    "pass_attempt",
+                )
+            ),
             "nonadjacent_state_after_fail_closed": nonadjacent_fail_closed,
             "bad_provenance_fail_closed": bad_provenance_fail_closed,
             "bad_provenance_atomic": play_count_before == play_count_after,
