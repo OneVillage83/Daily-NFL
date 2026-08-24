@@ -4,7 +4,8 @@
 **Milestone:** M6 — Canonical Play / Drive Normalization  
 **Architecture dependency:** F-5 — Canonical Play / Event / Possession / Drive Architecture  
 **Certified dependency base:** M0-M5  
-**Certification status:** **NOT YET CERTIFIED — STATIC AUDIT / REMEDIATION IMPLEMENTED; EXECUTABLE GATES PENDING**
+**Validated executable SHA:** `32e2eadd42da9b81a83d81a04eee180ed6b028e7`  
+**Certification status:** **ARCHITECTURE-CERTIFIED**
 
 ---
 
@@ -15,16 +16,16 @@ player, unit, and coaching state and belong to M7 State Engine V1. M6 therefore
 certifies the provider-row-to-canonical football transition ledger without
 prematurely claiming M7 state-model conformance.
 
-Existing M6/M6B implementation and 2025 validation are evidence to audit, not
-authority to weaken F-5. Earlier M6B output remains historical evidence but its
-old next-state check is explicitly superseded where this audit found a sequence
-assumption that did not prove raw-row adjacency.
+Existing M6/M6B implementation and 2025 validation were treated as evidence to
+audit, not authority to weaken F-5. Earlier M6B output remains historical
+evidence, but its old next-state check is explicitly superseded because it did
+not prove raw-row adjacency.
 
 ---
 
 ## 2. Locked F-5 / M6 contract
 
-M6 must provide a canonical hierarchy and transition model:
+M6 provides the canonical hierarchy and transition model:
 
 ```text
 GAME
@@ -41,7 +42,7 @@ GAME
           -> PLAY_STATE_AFTER
 ```
 
-The certification boundary requires:
+The certified boundary requires:
 
 - protected causal `PLAY_STATE_BEFORE` with no outcome/analytics leakage;
 - `PLAY_EXECUTION` as the object name; `PLAY_ACTION` only as a design modifier;
@@ -75,7 +76,7 @@ Derived analytics such as EPA/WPA/success remain outside canonical football trut
 | M6-08 | Primary play taxonomy | `SATISFIED` | PASS/RUSH/SCRAMBLE/SACK/KNEEL/SPIKE/PUNT/FG/KICKOFF/XP/2PT/PENALTY_ONLY/TIMEOUT/ADMINISTRATIVE/OTHER retained. |
 | M6-09 | Modifier vocabulary separate from play family | `SATISFIED` | RPO/screen/shotgun/under-center/motion/shift/no-huddle/designed-QB-run remain modifiers. |
 | M6-10 | No description-text inference for missing charting | `SATISFIED` | nflverse extractor uses structured columns only. |
-| M6-11 | Ordered event stream | `SATISFIED AFTER REMEDIATION` | Events remain sequence-addressed and now attach explicit passer/target/interceptor/kicker identity where supported. |
+| M6-11 | Ordered event stream | `SATISFIED AFTER REMEDIATION` | Events remain sequence-addressed and attach explicit passer/target/interceptor/kicker identity where supported. |
 | M6-12 | Explicit target event when structured target exists | `SATISFIED AFTER REMEDIATION` | Provider receiver ID creates canonical target participation and `TARGET` event. |
 | M6-13 | Canonical participation supported | `SATISFIED AFTER REMEDIATION` | Structured passer/rusher/target/kicker/punter/returner/interceptor IDs map through canonical PlayerIds. |
 | M6-14 | Provider player ID never becomes canonical identity | `SATISFIED AFTER REMEDIATION` | Normalizer requires an externally supplied M4-reconciled PlayerId mapping; unresolved IDs fail closed. |
@@ -98,11 +99,11 @@ Derived analytics such as EPA/WPA/success remain outside canonical football trut
 | M6-31 | Idempotent replay verifies child membership | `SATISFIED AFTER REMEDIATION` | Existing observation replay verifies expected participation/penalty observation identity/provenance. |
 | M6-32 | Provider-shaped row fields excluded downstream | `SATISFIED AFTER REMEDIATION` | Canonical JSON excludes provider IDs, provider drive/play IDs, raw description, and extraction flags. |
 | M6-33 | Complete canonical pre-state/result serialization | `SATISFIED AFTER REMEDIATION` | Serializer retains optional pre-state context, previous play, events, participation, penalties, full physical outcome, and state-after. |
-| M6-34 | Provisional direct persistence path cannot bypass certified writer | `SATISFIED AFTER REMEDIATION` | Historical module is now a compatibility boundary delegating writes to certified persistence. |
+| M6-34 | Provisional direct persistence path cannot bypass certified writer | `SATISFIED AFTER REMEDIATION` | Historical module delegates writes to certified persistence. |
 | M6-35 | No unnecessary schema migration | `SATISFIED` | M2 canonical ledgers + M5 v7 acquisition columns already satisfy M6 storage needs; migrations 1-7 remain unchanged. |
-| M6-36 | Deterministic no-network M6 validator | `IMPLEMENTED; LOCAL GATE PENDING` | `scripts/validate_m6_normalization.py` exercises execution/events/participation/penalty/state-after/drive/provenance/atomic failure. |
-| M6-37 | Corrected real nflverse season validator | `IMPLEMENTED; REAL GATE PENDING` | Validator records raw row index, validates only truly adjacent transitions, and reports skipped nonadjacent pairs. |
-| M6-38 | Full repository quality gate | `LOCAL VALIDATION PENDING` | pytest / Ruff / strict mypy / clean tree required. |
+| M6-36 | Deterministic no-network M6 validator | `VALIDATED` | Exact-head run exercises execution/events/participation/penalty/state-after/drive/provenance/atomic failure and passed. |
+| M6-37 | Corrected real nflverse season validator | `VALIDATED` | 2025 run validated 41,975 truly adjacent transitions, skipped 2,936 nonadjacent pairs, and recorded 0 state-after errors. |
+| M6-38 | Full repository quality gate | `VALIDATED` | 169 pytest PASS; Ruff PASS; strict mypy PASS on 89 source files; clean exact-head tree. |
 | M6-39 | F-6 through F-9 team/player/unit/coaching state | `DEFERRED BY ROADMAP` | These are M7 architecture dependencies, not M6 exit conditions. |
 
 ---
@@ -111,7 +112,7 @@ Derived analytics such as EPA/WPA/success remain outside canonical football trut
 
 ### F-01 — next-state validation could skip intervening raw rows
 
-**Severity:** CRITICAL — REMEDIATED
+**Severity:** CRITICAL — REMEDIATED AND VALIDATED
 
 The historical M6B validator dropped extraction failures and then paired adjacent
 *surviving* rows. An omitted no-play/administrative row could therefore sit
@@ -120,12 +121,17 @@ to be folded into the earlier play's `PLAY_STATE_AFTER`.
 
 M6 now carries `source_row_index`. A supplied `next_record` must be from the same
 provider game and have index exactly `current + 1`. Missing adjacency metadata or
-an intervening raw row fails closed. The real-season validator now skips, rather
-than bridges, nonadjacent surviving rows.
+an intervening raw row fails closed. The corrected 2025 real-season validator
+confirmed:
+
+```text
+next_state_adjacent_validated: 41,975
+next_state_nonadjacent_skipped: 2,936
+next_state_error_count: 0
+```
 
 The old historical statement `173 validated / 0 failures` is retained as history
-but is not accepted as final M6 certification evidence. A corrected 2025 rerun is
-required.
+but is not accepted as final M6 certification evidence.
 
 ### F-02 — unavailable charting was represented as false
 
@@ -138,50 +144,49 @@ run fields consistently. A false default conflates "provider observed absent" wi
 
 ### F-03 — normalized writes stopped at raw-content identity
 
-**Severity:** HIGH — REMEDIATED
+**Severity:** HIGH — REMEDIATED AND VALIDATED
 
 The provisional writer could retain `evidence_id` but not the specific M3
-acquisition observation. M5 already proved why those identities must remain
-separate. Certified M6 persistence now requires both, validates the exact
-observation/provider pair, persists it to play/participation/penalty observations,
-and includes acquisition identity in normalized observation identity.
+acquisition observation. Certified M6 persistence now requires both, validates the
+exact observation/provider pair, persists it to play/participation/penalty
+observations, and includes acquisition identity in normalized observation identity.
+The deterministic validator proved bad provenance fails before a canonical play can
+survive and rolls back atomically.
 
 ### F-04 — play participation was always empty
 
-**Severity:** HIGH — REMEDIATED
+**Severity:** HIGH — REMEDIATED AND VALIDATED
 
-The F-5 participation object existed but nflverse normalization never populated it.
 Structured player IDs are now extracted for explicitly supported roles. Provider
 IDs must be mapped to canonical PlayerIds before normalization; unresolved actors
-fail closed. The normalizer never manufactures canonical player IDs from provider
-strings.
+fail closed. The normalizer never manufactures production canonical player IDs from
+provider strings. The deterministic validator produced two canonical participants,
+and the real-season validator exercised structured participant extraction.
 
 ### F-05 — drive normalization was only an identity side effect
 
-**Severity:** MEDIUM — REMEDIATED
+**Severity:** MEDIUM — REMEDIATED AND VALIDATED
 
-Persistence created drive identity, but no deterministic F-5 drive summary was
-constructed. `normalize_drive` now validates one canonical drive/possession segment
-and derives only defensible start/end/count/points/turnover fields.
+`normalize_drive` now validates one canonical drive/possession segment and derives
+only defensible start/end/count/points/turnover fields. Deterministic validation
+confirmed a two-play drive with one first down.
 
 ### F-06 — canonical JSON repeated provider-row identity
 
-**Severity:** HIGH — REMEDIATED
+**Severity:** HIGH — REMEDIATED AND VALIDATED
 
-Provider IDs/play IDs/drive IDs and provider free text were repeated inside the
-normalized payload even though the observation record already carries lineage.
-The downstream canonical serializer now excludes provider-shaped identity and
-extraction flags. Provenance remains available on the observation envelope.
+The downstream canonical serializer now excludes provider-shaped identity,
+provider play/drive IDs, raw description, and extraction flags. Provenance remains
+on the observation envelope. The deterministic validator explicitly returned
+`payload_is_provider_neutral: true`.
 
 ### F-07 — direct import could bypass certified persistence
 
 **Severity:** HIGH — REMEDIATED
 
-The package export was switched to the certified writer, but the historical
-`normalization.persistence` module still contained the old write implementation.
-It is now a compatibility boundary that requires acquisition-observation
-provenance and delegates actual writes to certified persistence; shared canonical
-row helpers live separately in `persistence_core`.
+The historical `normalization.persistence` module is now a compatibility boundary
+that requires acquisition-observation provenance and delegates actual writes to
+certified persistence; shared canonical-row helpers live in `persistence_core`.
 
 ---
 
@@ -217,57 +222,93 @@ Unknown optional charting remains unknown instead of being inferred.
 
 ---
 
-## 7. Required executable certification evidence
+## 7. Executable certification evidence
 
-Before M6 certification, the branch must produce:
+Exact clean executable SHA:
 
 ```text
-Python 3.12.10 project .venv
-full pytest PASS
-Ruff PASS
-strict mypy PASS
-clean working tree
-schema version 7 remains valid
-fresh SQLite 0 -> 7 migrate PASS
-SQLite 7 -> 7 check PASS
-M6 deterministic validator PASS
-canonical PASS / PLAY_ACTION execution PASS
-ordered SNAP/THROW/TARGET/CATCH/... event evidence PASS
-canonical participation PASS
-penalty identity/event PASS
-adjacent PLAY_STATE_AFTER PASS
-nonadjacent state-after rejection PASS
-canonical drive construction PASS
-raw evidence ID retained
-acquisition-observation ID retained
-bad acquisition provenance rejection + atomic rollback PASS
-provider-neutral canonical payload PASS
-corrected real 2025 nflverse full-season normalization run
-real-season normalization_error_count = 0 for successfully extracted rows
-real-season next_state_error_count = 0 for truly adjacent validated transitions
-nonadjacent surviving transitions explicitly counted/skipped
+32e2eadd42da9b81a83d81a04eee180ed6b028e7
 ```
+
+Quality and persistence gates:
+
+```text
+Python 3.12.10 — E:\Daily-NFL\.venv\Scripts\python.exe
+Ruff: PASS
+mypy: PASS — 89 source files
+pytest: 169 passed in 4.84s
+working tree: clean
+fresh SQLite: 0 -> 7 PASS
+SQLite check: 7 -> 7 PASS
+foreign keys: true
+integrity: true
+```
+
+Deterministic F-5 gate:
+
+```text
+primary_play_type: PASS
+semantic_label: PLAY_ACTION_PASS
+event_types: SNAP, THROW, TARGET, CATCH, PENALTY
+participation_count: 2
+penalty_count: 1
+state_after_present: true
+state_after_drive_continues: true
+drive_play_count: 2
+drive_first_downs: 1
+raw evidence ID retained: PASS
+acquisition-observation ID retained: PASS
+payload SHA match: PASS
+payload_is_provider_neutral: true
+nonadjacent_state_after_fail_closed: true
+bad_provenance_fail_closed: true
+bad_provenance_atomic: true
+```
+
+Corrected real 2025 nflverse gate (`nflreadpy==0.1.5`):
+
+```text
+row_count: 48,771
+extracted_and_normalized_count: 45,196
+extraction_error_count: 3,575
+normalization_error_count: 0
+next_state_adjacent_validated: 41,975
+next_state_nonadjacent_skipped: 2,936
+next_state_error_count: 0
+```
+
+All strict extraction exclusions were confined to `<NULL>` / `no_play` rows whose
+causal pre-play score, quarter clock, or yardline could not be defensibly
+reconstructed. No successfully extracted state-bearing play failed canonical
+normalization.
+
+Full evidence is recorded in:
+
+- `docs/implementation/M6_LOCAL_VALIDATION_20260823.md`
 
 ---
 
-## 8. Current decision
+## 8. Certification decision
 
 ```text
 M6 F-5 STATIC ARCHITECTURE AUDIT: COMPLETE
-M6 RAW-ROW ADJACENCY REMEDIATION: IMPLEMENTED
-M6 UNKNOWN CHARTING SEMANTICS: IMPLEMENTED
-M6 CANONICAL PARTICIPATION: IMPLEMENTED
-M6 PENALTY PLAYER RECONCILIATION: IMPLEMENTED
-M6 DRIVE NORMALIZATION: IMPLEMENTED
-M6 M3/M5 ACQUISITION PROVENANCE: IMPLEMENTED
-M6 ATOMIC NORMALIZATION PERSISTENCE: IMPLEMENTED
-M6 PROVIDER-NEUTRAL DOWNSTREAM PAYLOAD: IMPLEMENTED
+M6 RAW-ROW ADJACENCY REMEDIATION: VALIDATED
+M6 UNKNOWN CHARTING SEMANTICS: VALIDATED
+M6 CANONICAL PARTICIPATION: VALIDATED
+M6 PENALTY PLAYER RECONCILIATION: VALIDATED
+M6 DRIVE NORMALIZATION: VALIDATED
+M6 M3/M5 ACQUISITION PROVENANCE: VALIDATED
+M6 ATOMIC NORMALIZATION PERSISTENCE: VALIDATED
+M6 PROVIDER-NEUTRAL DOWNSTREAM PAYLOAD: VALIDATED
 M6 DIRECT PERSISTENCE BYPASS: CLOSED
-M6 NO-NETWORK VALIDATOR: IMPLEMENTED
-M6 CORRECTED REAL-PBP VALIDATOR: IMPLEMENTED
-M6 LOCAL QUALITY GATE: PENDING
-M6 SQLITE GATE: PENDING
-M6 DETERMINISTIC VALIDATOR GATE: PENDING
-M6 REAL 2025 NFLVERSE GATE: PENDING
-M6 ARCHITECTURE CERTIFICATION: WITHHELD UNTIL ALL EXECUTABLE GATES PASS
+M6 NO-NETWORK VALIDATOR: PASS
+M6 CORRECTED REAL-PBP VALIDATOR: PASS
+M6 LOCAL QUALITY GATE: PASS
+M6 SQLITE GATE: PASS
+M6 REAL 2025 NFLVERSE GATE: PASS
+M6 ARCHITECTURE CERTIFICATION: ARCHITECTURE-CERTIFIED
 ```
+
+**Final decision: M6 / F-5 is `ARCHITECTURE-CERTIFIED` on executable SHA `32e2eadd42da9b81a83d81a04eee180ed6b028e7`.**
+
+Documentation-only certification commits after that SHA do not alter the executable behavior that was validated. If later evidence reveals an M6/F-5 defect, M6 must be explicitly reopened and recertified.
