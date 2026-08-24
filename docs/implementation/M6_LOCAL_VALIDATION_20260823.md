@@ -3,7 +3,7 @@
 **Project:** The Daily Line — Daily NFL  
 **Milestone:** M6 — Canonical Play / Drive Normalization  
 **Architecture:** F-5 — Canonical Play / Event / Possession / Drive Architecture  
-**Validated executable SHA:** `32e2eadd42da9b81a83d81a04eee180ed6b028e7`  
+**Validated executable SHA:** `5f1e2efe115c8f889d99eb7f6169050ee90c8ca7`  
 **Interpreter:** Python 3.12.10 — `E:\Daily-NFL\.venv\Scripts\python.exe`  
 **Result:** **PASS**
 
@@ -13,7 +13,7 @@
 
 ```text
 git rev-parse HEAD
-32e2eadd42da9b81a83d81a04eee180ed6b028e7
+5f1e2efe115c8f889d99eb7f6169050ee90c8ca7
 
 git status --short
 <clean>
@@ -23,7 +23,25 @@ No executable or test changes occurred after this SHA during validation. Documen
 
 ---
 
-## 2. Project quality gate
+## 2. Targeted persistence regression gate
+
+```text
+python -m pytest -q tests/test_play_normalization_persistence.py
+5 passed in 0.50s
+```
+
+This targeted gate includes the final PR-review remediations:
+
+- deterministic normalized observation identity is enforced by the writer;
+- exact idempotent child membership is checked;
+- extra participation/penalty children are rejected;
+- bad acquisition provenance fails closed;
+- failed persistence remains atomic;
+- provider revisions append rather than replacing canonical identity.
+
+---
+
+## 3. Project quality gate
 
 ```text
 python -m ruff check .
@@ -33,14 +51,12 @@ python -m mypy .
 Success: no issues found in 89 source files
 
 python -m pytest -q
-169 passed in 4.84s
+171 passed in 3.93s
 ```
-
-Targeted M6 behavior suite on the preceding candidate also passed 33/33, and the same behaviors are included in the final 169-test exact-head suite.
 
 ---
 
-## 3. SQLite schema/integrity gate
+## 4. SQLite schema/integrity gate
 
 M6 required no schema v8. Existing M2 canonical child ledgers plus M5 schema-v7 acquisition-observation columns already satisfy the F-5 persistence requirements.
 
@@ -67,7 +83,7 @@ integrity: PASS
 
 ---
 
-## 4. Deterministic no-network F-5 validator
+## 5. Deterministic no-network F-5 validator
 
 Command:
 
@@ -101,9 +117,11 @@ bad_provenance_atomic: true
 
 This proves the certified persistence boundary retains both immutable raw-content identity and the exact acquisition-observation identity, rejects mismatched provenance before canonical data can survive, and excludes provider-shaped IDs/free text from the downstream canonical payload.
 
+The targeted persistence gate additionally proves that a write cannot supply an arbitrary observation ID and that idempotent replay rejects extra child membership instead of merely confirming expected children exist.
+
 ---
 
-## 5. Real nflverse dependency gate
+## 6. Real nflverse dependency gate
 
 ```text
 nflreadpy version: 0.1.5
@@ -113,7 +131,7 @@ nflreadpy version: 0.1.5
 
 ---
 
-## 6. Corrected real 2025 nflverse full-season PBP gate
+## 7. Corrected real 2025 nflverse full-season PBP gate
 
 Command:
 
@@ -182,36 +200,39 @@ The 2,936 skipped pairs are expected positive evidence: the validator detected a
 
 ---
 
-## 7. Certification conclusion
+## 8. Certification conclusion
 
 All required M6/F-5 executable gates passed on the exact clean executable SHA:
 
 ```text
-Python 3.12.10 project venv                  PASS
-Ruff                                         PASS
-strict mypy                                  PASS
-pytest — 169 passed                          PASS
-SQLite 0 -> 7                                PASS
-SQLite 7 -> 7                                PASS
-no-network F-5 validator                     PASS
-canonical PLAY_EXECUTION / modifiers         PASS
-ordered event stream                         PASS
-canonical participation                      PASS
-first-class penalty handling                 PASS
-physical vs official outcome separation      PASS
-adjacent PLAY_STATE_AFTER                     PASS
-nonadjacent transition fail-closed            PASS
-deterministic drive normalization             PASS
-raw evidence provenance                       PASS
-acquisition-observation provenance             PASS
-atomic failed-provenance rollback              PASS
-provider-neutral canonical payload             PASS
-real 2025 PBP normalization — 45,196 rows     PASS
-real normalization errors — 0                  PASS
-adjacent state transitions — 41,975            PASS
-adjacent state errors — 0                      PASS
-nonadjacent transitions explicitly skipped     PASS
-git working tree clean                         PASS
+Python 3.12.10 project venv                   PASS
+targeted persistence regressions — 5 passed  PASS
+Ruff                                          PASS
+strict mypy                                   PASS
+pytest — 171 passed                           PASS
+SQLite 0 -> 7                                 PASS
+SQLite 7 -> 7                                 PASS
+no-network F-5 validator                      PASS
+canonical PLAY_EXECUTION / modifiers          PASS
+ordered event stream                          PASS
+canonical participation                       PASS
+first-class penalty handling                  PASS
+physical vs official outcome separation       PASS
+adjacent PLAY_STATE_AFTER                      PASS
+nonadjacent transition fail-closed             PASS
+deterministic drive normalization              PASS
+raw evidence provenance                        PASS
+acquisition-observation provenance              PASS
+deterministic observation identity              PASS
+exact idempotent child membership               PASS
+atomic failed-provenance rollback               PASS
+provider-neutral canonical payload              PASS
+real 2025 PBP normalization — 45,196 rows      PASS
+real normalization errors — 0                   PASS
+adjacent state transitions — 41,975             PASS
+adjacent state errors — 0                       PASS
+nonadjacent transitions explicitly skipped      PASS
+git working tree clean                          PASS
 ```
 
 **M6 executable validation decision: PASS.**
