@@ -14,6 +14,7 @@ from daily_nfl.normalization.contracts import (
     ProviderParticipantRecord,
     ProviderPenaltyRecord,
 )
+from daily_nfl.normalization.drive import DriveNormalizationError, normalize_drive
 from daily_nfl.normalization.nflverse import (
     PlayNormalizationError,
     classify_play_type,
@@ -25,6 +26,7 @@ from daily_nfl.normalization.nflverse_extract import (
 )
 
 __all__ = [
+    "DriveNormalizationError",
     "NflverseGameContext",
     "NflversePlayRecord",
     "NflverseRowExtractionError",
@@ -36,6 +38,7 @@ __all__ = [
     "ProviderPenaltyRecord",
     "classify_play_type",
     "extract_nflverse_play_record",
+    "normalize_drive",
     "normalize_nflverse_play",
     "normalized_play_observation_id",
     "record_normalized_play",
