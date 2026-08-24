@@ -5,9 +5,9 @@ from daily_nfl.domain import (
     ParticipationSide,
     PenaltyDisposition,
     PlayDesignModifier,
+    PlayerId,
     PlayEventType,
     PlayType,
-    PlayerId,
     TeamSeasonId,
 )
 from daily_nfl.normalization import (
