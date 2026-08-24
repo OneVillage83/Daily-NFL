@@ -74,6 +74,24 @@ def _penalty_observation_id(observation_id: str, sequence: int) -> str:
     return f"peo_{digest}"
 
 
+def _validate_observation_identity(
+    *,
+    bundle: NormalizedPlayBundle,
+    provenance: NormalizationProvenance,
+) -> None:
+    expected = normalized_play_observation_id(
+        evidence_id=provenance.evidence_id,
+        evidence_observation_id=provenance.evidence_observation_id,
+        provider_id=bundle.provider_id,
+        provider_play_id=bundle.provider_play_id,
+        provider_revision=provenance.provider_revision,
+    )
+    if provenance.observation_id != expected:
+        raise NormalizedPlayConflictError(
+            "normalization observation_id must match deterministic provenance identity"
+        )
+
+
 def _validate_acquisition_provenance(
     connection: sqlite3.Connection,
     *,
@@ -100,54 +118,78 @@ def _verify_existing_children(
     bundle: NormalizedPlayBundle,
     provenance: NormalizationProvenance,
 ) -> None:
-    for sequence, item in enumerate(bundle.participation, start=1):
-        observation_id = _participation_observation_id(
-            provenance.observation_id,
-            sequence,
-        )
-        row = connection.execute(
-            """
-            SELECT participation_id, evidence_id, evidence_observation_id,
-                   provider_id, provider_revision
-            FROM participation_observations
-            WHERE observation_id = ?
-            """,
-            (observation_id,),
-        ).fetchone()
-        expected = (
+    play_id = str(bundle.pre_play_state.play_id)
+    participation_rows = connection.execute(
+        """
+        SELECT observation_id, participation_id, evidence_id,
+               evidence_observation_id, provider_id, provider_revision
+        FROM participation_observations
+        WHERE play_id = ?
+          AND evidence_id = ?
+          AND evidence_observation_id = ?
+          AND provider_id = ?
+          AND provider_revision IS ?
+        ORDER BY observation_id
+        """,
+        (
+            play_id,
+            provenance.evidence_id,
+            provenance.evidence_observation_id,
+            bundle.provider_id,
+            provenance.provider_revision,
+        ),
+    ).fetchall()
+    expected_participation = sorted(
+        (
+            _participation_observation_id(provenance.observation_id, sequence),
             str(item.participation_id),
             provenance.evidence_id,
             provenance.evidence_observation_id,
             bundle.provider_id,
             provenance.provider_revision,
         )
-        if row is None or tuple(row) != expected:
-            raise NormalizedPlayConflictError(
-                "stored participation observation conflicts with normalized membership"
-            )
+        for sequence, item in enumerate(bundle.participation, start=1)
+    )
+    if [tuple(row) for row in participation_rows] != expected_participation:
+        raise NormalizedPlayConflictError(
+            "stored participation observation membership is not exact"
+        )
 
-    for sequence, penalty in enumerate(bundle.penalties, start=1):
-        observation_id = _penalty_observation_id(provenance.observation_id, sequence)
-        row = connection.execute(
-            """
-            SELECT penalty_id, evidence_id, evidence_observation_id,
-                   provider_id, provider_revision
-            FROM penalty_observations
-            WHERE observation_id = ?
-            """,
-            (observation_id,),
-        ).fetchone()
-        expected = (
+    penalty_rows = connection.execute(
+        """
+        SELECT observation_id, penalty_id, evidence_id,
+               evidence_observation_id, provider_id, provider_revision
+        FROM penalty_observations
+        WHERE play_id = ?
+          AND evidence_id = ?
+          AND evidence_observation_id = ?
+          AND provider_id = ?
+          AND provider_revision IS ?
+        ORDER BY observation_id
+        """,
+        (
+            play_id,
+            provenance.evidence_id,
+            provenance.evidence_observation_id,
+            bundle.provider_id,
+            provenance.provider_revision,
+        ),
+    ).fetchall()
+    expected_penalties = sorted(
+        (
+            _penalty_observation_id(provenance.observation_id, sequence),
             str(penalty.penalty_id),
             provenance.evidence_id,
             provenance.evidence_observation_id,
             bundle.provider_id,
             provenance.provider_revision,
         )
-        if row is None or tuple(row) != expected:
-            raise NormalizedPlayConflictError(
-                "stored penalty observation conflicts with normalized membership"
-            )
+        for sequence, penalty in enumerate(bundle.penalties, start=1)
+    )
+    if [tuple(row) for row in penalty_rows] != expected_penalties:
+        raise NormalizedPlayConflictError(
+            "stored penalty observation membership is not exact"
+        )
 
 
 def _insert_participation_observations(
@@ -244,6 +286,7 @@ def record_normalized_play(
 ) -> None:
     """Atomically persist one certified M6 normalized play observation."""
 
+    _validate_observation_identity(bundle=bundle, provenance=provenance)
     _validate_acquisition_provenance(
         connection,
         bundle=bundle,
