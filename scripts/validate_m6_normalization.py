@@ -37,8 +37,8 @@ from daily_nfl.normalization import (  # noqa: E402
 )
 from daily_nfl.persistence import current_schema_version, open_database  # noqa: E402
 from daily_nfl.providers import (  # noqa: E402
-    DatasetKind,
     NFLVERSE_DESCRIPTOR,
+    DatasetKind,
     record_provider,
     record_provider_capability,
 )
@@ -77,6 +77,12 @@ def _knowledge() -> KnowledgeTimestamp:
     )
 
 
+def _required_iso(value: datetime | None, label: str) -> str:
+    if value is None:
+        raise RuntimeError(f"M6 certification fixture requires {label}")
+    return value.isoformat()
+
+
 def _seed_raw_acquisition(connection: sqlite3.Connection) -> None:
     record_provider(connection, NFLVERSE_DESCRIPTOR)
     capability = NFLVERSE_DESCRIPTOR.capability_for(DatasetKind.PLAY_BY_PLAY)
@@ -105,8 +111,8 @@ def _seed_raw_acquisition(connection: sqlite3.Connection) -> None:
             "application/octet-stream",
             RAW_SHA256,
             "fixture/m6-certification.bin",
-            knowledge.observed_at.isoformat(),
-            knowledge.ingested_at.isoformat(),
+            _required_iso(knowledge.observed_at, "observed_at"),
+            _required_iso(knowledge.ingested_at, "ingested_at"),
             knowledge.available_at.isoformat(),
             knowledge.availability_method.value,
             knowledge.availability_confidence.value,
@@ -131,8 +137,8 @@ def _seed_raw_acquisition(connection: sqlite3.Connection) -> None:
             DatasetKind.PLAY_BY_PLAY.value,
             capability_id,
             "fixture://m6/certification",
-            knowledge.observed_at.isoformat(),
-            knowledge.ingested_at.isoformat(),
+            _required_iso(knowledge.observed_at, "observed_at"),
+            _required_iso(knowledge.ingested_at, "ingested_at"),
             knowledge.available_at.isoformat(),
             knowledge.availability_method.value,
             knowledge.availability_confidence.value,
