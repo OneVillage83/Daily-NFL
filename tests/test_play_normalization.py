@@ -2,7 +2,9 @@ import pytest
 
 from daily_nfl.domain import (
     GameId,
+    ParticipationSide,
     PenaltyDisposition,
+    PlayerId,
     PlayDesignModifier,
     PlayEventType,
     PlayType,
@@ -12,6 +14,7 @@ from daily_nfl.normalization import (
     NflverseGameContext,
     NflversePlayRecord,
     PlayNormalizationError,
+    ProviderParticipantRecord,
     ProviderPenaltyRecord,
     classify_play_type,
     normalize_nflverse_play,
@@ -21,12 +24,18 @@ from daily_nfl.reconciliation import play_id_for
 GAME_ID = GameId("nflg_fixture")
 HOME_ID = TeamSeasonId("tms_home")
 AWAY_ID = TeamSeasonId("tms_away")
+PASSER_ID = PlayerId("ply_passer")
+TARGET_ID = PlayerId("ply_target")
 CONTEXT = NflverseGameContext(
     game_id=GAME_ID,
     home_team_code="HOM",
     away_team_code="AWY",
     home_team_season_id=HOME_ID,
     away_team_season_id=AWAY_ID,
+    player_ids_by_external_id={
+        "gsis-passer": PASSER_ID,
+        "gsis-target": TARGET_ID,
+    },
 )
 
 
@@ -44,6 +53,7 @@ def _row(**overrides: object) -> NflversePlayRecord:
         "yards_to_goal": 75,
         "home_score_before": 0,
         "away_score_before": 0,
+        "source_row_index": 1,
     }
     values.update(overrides)
     return NflversePlayRecord(**values)  # type: ignore[arg-type]
@@ -56,10 +66,25 @@ def test_complete_play_action_pass_normalizes_to_canonical_state() -> None:
         play_action=True,
         official_yards_gained=12,
         first_down=True,
+        participants=(
+            ProviderParticipantRecord(
+                player_external_id="gsis-passer",
+                team_code="HOM",
+                side=ParticipationSide.OFFENSE,
+                role="passer",
+            ),
+            ProviderParticipantRecord(
+                player_external_id="gsis-target",
+                team_code="HOM",
+                side=ParticipationSide.OFFENSE,
+                role="target",
+            ),
+        ),
         description="fixture completed pass",
     )
     following = _row(
         provider_play_id="120",
+        source_row_index=2,
         quarter_seconds_remaining=800,
         down=1,
         distance=10,
@@ -83,18 +108,22 @@ def test_complete_play_action_pass_normalizes_to_canonical_state() -> None:
     assert bundle.execution.semantic_label == "PLAY_ACTION_PASS"
     assert bundle.result.official_yards_gained == 12
     assert bundle.result.first_down
+    assert [item.player_id for item in bundle.participation] == [PASSER_ID, TARGET_ID]
     assert [event.event_type for event in bundle.events] == [
         PlayEventType.SNAP,
         PlayEventType.THROW,
+        PlayEventType.TARGET,
         PlayEventType.CATCH,
     ]
+    assert bundle.events[1].player_id == PASSER_ID
+    assert bundle.events[2].player_id == TARGET_ID
     assert bundle.state_after is not None
     assert bundle.state_after.down == 1
     assert bundle.state_after.yards_to_goal == 63
     assert bundle.state_after.drive_continues
 
 
-def test_interception_uses_next_row_to_close_drive_and_change_possession() -> None:
+def test_interception_uses_adjacent_row_to_close_drive_and_change_possession() -> None:
     current = _row(
         pass_attempt=True,
         interception=True,
@@ -103,6 +132,7 @@ def test_interception_uses_next_row_to_close_drive_and_change_possession() -> No
     following = _row(
         provider_play_id="200",
         provider_drive_id="2",
+        source_row_index=2,
         offense_team_code="AWY",
         defense_team_code="HOM",
         quarter_seconds_remaining=700,
@@ -129,6 +159,51 @@ def test_interception_uses_next_row_to_close_drive_and_change_possession() -> No
     assert bundle.state_after.next_possession.offense_team_season_id == AWAY_ID
     assert not bundle.state_after.drive_continues
     assert PlayEventType.INTERCEPTION in {event.event_type for event in bundle.events}
+
+
+def test_nonadjacent_raw_row_cannot_define_state_after() -> None:
+    with pytest.raises(PlayNormalizationError, match="cannot skip intervening"):
+        normalize_nflverse_play(
+            _row(pass_attempt=True),
+            context=CONTEXT,
+            canonical_sequence=8,
+            drive_sequence=2,
+            possession_sequence=3,
+            next_record=_row(provider_play_id="300", source_row_index=3),
+            next_drive_sequence=2,
+            next_possession_sequence=3,
+        )
+
+
+def test_state_after_requires_raw_row_index_metadata() -> None:
+    with pytest.raises(PlayNormalizationError, match="adjacency metadata"):
+        normalize_nflverse_play(
+            _row(pass_attempt=True, source_row_index=None),
+            context=CONTEXT,
+            canonical_sequence=8,
+            drive_sequence=2,
+            possession_sequence=3,
+            next_record=_row(provider_play_id="300", source_row_index=None),
+            next_drive_sequence=2,
+            next_possession_sequence=3,
+        )
+
+
+def test_unresolved_provider_participant_fails_closed() -> None:
+    participant = ProviderParticipantRecord(
+        player_external_id="unresolved-gsis",
+        team_code="HOM",
+        side=ParticipationSide.OFFENSE,
+        role="passer",
+    )
+    with pytest.raises(PlayNormalizationError, match="participant identity is unresolved"):
+        normalize_nflverse_play(
+            _row(pass_attempt=True, participants=(participant,)),
+            context=CONTEXT,
+            canonical_sequence=8,
+            drive_sequence=2,
+            possession_sequence=3,
+        )
 
 
 def test_penalty_only_no_play_preserves_physical_from_official_result() -> None:
