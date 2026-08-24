@@ -447,7 +447,7 @@ Documentation/status commits after `d553c3a46b36478b069eae97b7b52f283c97b47a` do
 
 **Milestone:** Canonical Play / Drive Normalization  
 **Architecture:** F-5 — Canonical Play / Event / Possession / Drive Architecture  
-**Validated executable code head:** `32e2eadd42da9b81a83d81a04eee180ed6b028e7`
+**Validated executable code head:** `5f1e2efe115c8f889d99eb7f6169050ee90c8ca7`
 
 Material architecture corrections included:
 
@@ -459,10 +459,10 @@ Material architecture corrections included:
 - ordered event streams now attach canonical passer/target/interceptor/kicker identity when supported;
 - deterministic canonical drive normalization with validated game/drive/possession-segment boundaries;
 - M3/M5 raw content plus acquisition-observation provenance required for normalized writes;
-- normalized observation identity distinguishes repeated acquisitions of identical raw content;
+- normalized observation identity distinguishes repeated acquisitions of identical raw content and is enforced at write time;
 - exact raw observation/provider identity checked before canonical writes;
 - canonical play/participation/penalty persistence made atomic with a SQLite savepoint;
-- idempotent replay verifies child membership/provenance;
+- idempotent replay compares exact participation/penalty child sets and rejects extra children;
 - historical direct persistence path closed as a bypass and redirected to the certified writer;
 - provider-shaped play/drive IDs, free-text description, and extraction flags removed from downstream canonical JSON;
 - deterministic no-network F-5 validator added;
@@ -473,9 +473,10 @@ Final exact-head quality gate:
 ```text
 Python 3.12.10
 E:\Daily-NFL\.venv\Scripts\python.exe
+targeted persistence regressions: 5 passed in 0.50s
 Ruff: All checks passed!
 mypy: Success: no issues found in 89 source files
-pytest: 169 passed in 4.84s
+pytest: 171 passed in 3.93s
 git status --short: clean
 ```
 
@@ -512,6 +513,8 @@ payload_is_provider_neutral: true
 nonadjacent_state_after_fail_closed: true
 bad_provenance_fail_closed: true
 bad_provenance_atomic: true
+deterministic observation identity: PASS
+exact idempotent child membership: PASS
 ```
 
 Corrected real nflverse 2025 PBP gate:
@@ -542,7 +545,7 @@ Final state:
 M6 — ARCHITECTURE-CERTIFIED
 ```
 
-Documentation/status commits after `32e2eadd42da9b81a83d81a04eee180ed6b028e7` do not alter the executable behavior that was validated. If later evidence reveals an M6/F-5 defect, M6 must be explicitly reopened and recertified.
+Documentation/status commits after `5f1e2efe115c8f889d99eb7f6169050ee90c8ca7` do not alter the executable behavior that was validated. If later evidence reveals an M6/F-5 defect, M6 must be explicitly reopened and recertified.
 
 ---
 
