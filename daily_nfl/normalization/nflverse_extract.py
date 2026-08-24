@@ -5,8 +5,12 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping
 
-from daily_nfl.domain import PenaltyDisposition
-from daily_nfl.normalization.contracts import NflversePlayRecord, ProviderPenaltyRecord
+from daily_nfl.domain import ParticipationSide, PenaltyDisposition
+from daily_nfl.normalization.contracts import (
+    NflversePlayRecord,
+    ProviderParticipantRecord,
+    ProviderPenaltyRecord,
+)
 
 
 class NflverseRowExtractionError(ValueError):
@@ -107,6 +111,7 @@ def _score_pair(
 
 def _canonical_timeout(value: int | None) -> int | None:
     """Treat provider sentinel values outside NFL timeout state as unknown."""
+
     if value is None or value < 0:
         return None
     return value
@@ -151,7 +156,7 @@ def _penalties(row: Mapping[str, object], *, no_play: bool) -> tuple[ProviderPen
             team_code=team_code,
             penalty_type=penalty_type,
             disposition=_penalty_disposition(_text(row, "desc")),
-            player_external_id=_text(row, "penalty_player_id"),
+            player_external_id=_id_text(row, "penalty_player_id"),
             yards=_integer(row, "penalty_yards"),
             automatic_first_down=_flag(row, "first_down_penalty"),
             nullifies_play=no_play,
@@ -159,12 +164,43 @@ def _penalties(row: Mapping[str, object], *, no_play: bool) -> tuple[ProviderPen
     )
 
 
+def _participants(row: Mapping[str, object]) -> tuple[ProviderParticipantRecord, ...]:
+    offense = _text(row, "posteam")
+    defense = _text(row, "defteam")
+    specs = (
+        ("passer_player_id", offense, ParticipationSide.OFFENSE, "passer"),
+        ("rusher_player_id", offense, ParticipationSide.OFFENSE, "rusher"),
+        ("receiver_player_id", offense, ParticipationSide.OFFENSE, "target"),
+        ("kicker_player_id", offense, ParticipationSide.SPECIAL_TEAMS, "kicker"),
+        ("punter_player_id", offense, ParticipationSide.SPECIAL_TEAMS, "punter"),
+        ("return_player_id", defense, ParticipationSide.SPECIAL_TEAMS, "returner"),
+        ("interception_player_id", defense, ParticipationSide.DEFENSE, "interceptor"),
+    )
+    participants: list[ProviderParticipantRecord] = []
+    for key, team_code, side, role in specs:
+        external_id = _id_text(row, key)
+        if external_id is None:
+            continue
+        if team_code is None:
+            raise NflverseRowExtractionError(
+                f"{key} is present but participant team context is missing"
+            )
+        participants.append(
+            ProviderParticipantRecord(
+                player_external_id=external_id,
+                team_code=team_code,
+                side=side,
+                role=role,
+            )
+        )
+    return tuple(participants)
+
+
 def extract_nflverse_play_record(row: Mapping[str, object]) -> NflversePlayRecord:
     """Convert one real nflverse PBP row into the small M6 semantic contract.
 
-    Base PBP does not contain FTN charting concepts such as play action, motion,
-    screen, or RPO. Those fields intentionally remain false until an explicit
-    enrichment source is joined later.
+    Base PBP does not contain every charting concept. Unsupported fields remain
+    ``None`` (unknown), never false-by-default and never inferred from free text.
     """
 
     game_id = _id_text(row, "game_id")
@@ -229,7 +265,15 @@ def extract_nflverse_play_record(row: Mapping[str, object]) -> NflversePlayRecor
         two_point_attempt=_flag(row, "two_point_attempt"),
         timeout=_flag(row, "timeout") or play_type == "timeout",
         administrative=_flag(row, "quarter_end") or play_type == "note",
-        shotgun=_flag(row, "shotgun"),
-        no_huddle=_flag(row, "no_huddle"),
+        play_action=_optional_flag(row, "play_action"),
+        rpo=_optional_flag(row, "rpo"),
+        screen=_optional_flag(row, "screen"),
+        shotgun=_optional_flag(row, "shotgun"),
+        under_center=_optional_flag(row, "under_center"),
+        motion=_optional_flag(row, "motion"),
+        shift=_optional_flag(row, "shift"),
+        no_huddle=_optional_flag(row, "no_huddle"),
+        designed_qb_run=_optional_flag(row, "designed_qb_run"),
+        participants=_participants(row),
         penalties=_penalties(row, no_play=no_play),
     )
