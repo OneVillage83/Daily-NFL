@@ -1,24 +1,19 @@
-"""Certified M6 persistence boundary for canonical normalized play observations.
-
-This module composes the provisional canonical-row identity helpers with the
-M3/M5 acquisition-observation provenance contract. New M6 writes are atomic and
-must identify the exact raw acquisition observation that supported normalization.
-"""
+"""Certified M6 persistence boundary for canonical normalized play observations."""
 
 from __future__ import annotations
 
 import hashlib
-import json
 import sqlite3
 from dataclasses import dataclass
 
 from daily_nfl.domain import KnowledgeTimestamp
 from daily_nfl.normalization.contracts import NormalizedPlayBundle
-from daily_nfl.normalization.persistence import (
+from daily_nfl.normalization.persistence_core import (
     NormalizedPlayConflictError,
     _ensure_canonical_rows,
     _iso,
 )
+from daily_nfl.normalization.serialization import serialize_normalized_play
 
 _SAVEPOINT = "m6_normalized_play_write"
 
@@ -69,178 +64,6 @@ def normalized_play_observation_id(
     return f"pob_{hashlib.sha256(payload).hexdigest()}"
 
 
-def _payload(bundle: NormalizedPlayBundle) -> dict[str, object]:
-    pre = bundle.pre_play_state
-    result = bundle.result
-    physical = result.physical_outcome
-    after = bundle.state_after
-    return {
-        "contract_version": "NFL_CANONICAL_PLAY_V1",
-        "game_id": str(bundle.game_id),
-        "canonical_sequence": bundle.canonical_sequence,
-        "drive_sequence": bundle.drive_sequence,
-        "possession_sequence": bundle.possession_sequence,
-        "provider_id": bundle.provider_id,
-        "provider_play_id": bundle.provider_play_id,
-        "provider_drive_id": bundle.provider_drive_id,
-        "description": bundle.description,
-        "pre_play_state": {
-            "play_id": str(pre.play_id),
-            "previous_play_id": (
-                str(pre.previous_play_id) if pre.previous_play_id is not None else None
-            ),
-            "drive_id": str(pre.drive_id) if pre.drive_id is not None else None,
-            "possession_id": str(pre.possession.possession_id),
-            "possession_segment_id": (
-                str(pre.possession_segment_id)
-                if pre.possession_segment_id is not None
-                else None
-            ),
-            "offense_team_season_id": str(pre.possession.offense_team_season_id),
-            "defense_team_season_id": str(pre.possession.defense_team_season_id),
-            "period": pre.period.number,
-            "is_overtime": pre.period.is_overtime,
-            "clock_seconds_remaining": pre.clock_seconds_remaining,
-            "play_clock_seconds_remaining": pre.play_clock_seconds_remaining,
-            "down": pre.down,
-            "distance": pre.distance,
-            "yards_to_goal": pre.yards_to_goal,
-            "home_score": pre.home_score,
-            "away_score": pre.away_score,
-            "home_timeouts_remaining": pre.home_timeouts_remaining,
-            "away_timeouts_remaining": pre.away_timeouts_remaining,
-            "kickoff_state": pre.kickoff_state,
-            "try_state": pre.try_state,
-            "two_minute_state": pre.two_minute_state,
-            "overtime_state": pre.overtime_state,
-            "offensive_personnel": pre.offensive_personnel,
-            "defensive_personnel": pre.defensive_personnel,
-            "offensive_formation": pre.offensive_formation,
-            "defensive_front": pre.defensive_front,
-            "coverage_shell": pre.coverage_shell,
-            "motion": pre.motion,
-            "shift": pre.shift,
-            "shotgun": pre.shotgun,
-            "no_huddle": pre.no_huddle,
-            "weather_snapshot_id": pre.weather_snapshot_id,
-            "surface_state_id": pre.surface_state_id,
-        },
-        "execution": {
-            "primary_play_type": bundle.execution.primary_play_type.value,
-            "modifiers": sorted(modifier.value for modifier in bundle.execution.modifiers),
-            "semantic_label": bundle.execution.semantic_label,
-        },
-        "events": [
-            {
-                "play_event_id": str(event.play_event_id),
-                "sequence": event.sequence,
-                "event_type": event.event_type.value,
-                "player_id": str(event.player_id) if event.player_id is not None else None,
-                "team_season_id": (
-                    str(event.team_season_id) if event.team_season_id is not None else None
-                ),
-                "detail": event.detail,
-            }
-            for event in bundle.events
-        ],
-        "participation": [
-            {
-                "participation_id": str(item.participation_id),
-                "player_id": str(item.player_id),
-                "team_season_id": str(item.team_season_id),
-                "side": item.side.value,
-                "role": item.role,
-                "on_field": item.on_field,
-            }
-            for item in bundle.participation
-        ],
-        "penalties": [
-            {
-                "penalty_id": str(penalty.penalty_id),
-                "team_season_id": str(penalty.team_season_id),
-                "player_id": str(penalty.player_id) if penalty.player_id is not None else None,
-                "penalty_type": penalty.penalty_type,
-                "disposition": penalty.disposition.value,
-                "yards": penalty.yards,
-                "automatic_first_down": penalty.automatic_first_down,
-                "loss_of_down": penalty.loss_of_down,
-                "nullifies_play": penalty.nullifies_play,
-                "enforcement_spot": penalty.enforcement_spot,
-            }
-            for penalty in bundle.penalties
-        ],
-        "result": {
-            "official_yards_gained": result.official_yards_gained,
-            "first_down": result.first_down,
-            "touchdown": result.touchdown,
-            "safety": result.safety,
-            "completion": result.completion,
-            "interception": result.interception,
-            "sack": result.sack,
-            "fumble": result.fumble,
-            "fumble_lost": result.fumble_lost,
-            "possession_changed": result.possession_changed,
-            "score_change": result.score_change,
-            "no_play": result.no_play,
-            "kick_result": result.kick_result,
-            "physical_outcome": (
-                None
-                if physical is None
-                else {
-                    "yards_gained": physical.yards_gained,
-                    "first_down": physical.first_down,
-                    "touchdown": physical.touchdown,
-                    "safety": physical.safety,
-                    "completion": physical.completion,
-                    "interception": physical.interception,
-                    "sack": physical.sack,
-                    "fumble": physical.fumble,
-                    "fumble_lost": physical.fumble_lost,
-                    "possession_changed": physical.possession_changed,
-                    "score_change": physical.score_change,
-                }
-            ),
-        },
-        "state_after": (
-            None
-            if after is None
-            else {
-                "next_possession_id": (
-                    str(after.next_possession.possession_id)
-                    if after.next_possession is not None
-                    else None
-                ),
-                "offense_team_season_id": (
-                    str(after.next_possession.offense_team_season_id)
-                    if after.next_possession is not None
-                    else None
-                ),
-                "defense_team_season_id": (
-                    str(after.next_possession.defense_team_season_id)
-                    if after.next_possession is not None
-                    else None
-                ),
-                "period": after.period.number,
-                "is_overtime": after.period.is_overtime,
-                "clock_seconds_remaining": after.clock_seconds_remaining,
-                "down": after.down,
-                "distance": after.distance,
-                "yards_to_goal": after.yards_to_goal,
-                "home_score": after.home_score,
-                "away_score": after.away_score,
-                "drive_continues": after.drive_continues,
-            }
-        ),
-    }
-
-
-def serialize_normalized_play(bundle: NormalizedPlayBundle) -> tuple[str, str]:
-    """Serialize every canonical M6 field that is safe to persist downstream."""
-
-    payload_json = json.dumps(_payload(bundle), sort_keys=True, separators=(",", ":"))
-    return payload_json, hashlib.sha256(payload_json.encode()).hexdigest()
-
-
 def _participation_observation_id(observation_id: str, sequence: int) -> str:
     digest = hashlib.sha256(f"{observation_id}|participation|{sequence}".encode()).hexdigest()
     return f"pao_{digest}"
@@ -277,57 +100,54 @@ def _verify_existing_children(
     bundle: NormalizedPlayBundle,
     provenance: NormalizationProvenance,
 ) -> None:
-    participation_rows = connection.execute(
-        """
-        SELECT observation_id, participation_id, evidence_id,
-               evidence_observation_id, provider_id, provider_revision
-        FROM participation_observations
-        WHERE play_id = ? AND evidence_observation_id = ?
-        ORDER BY observation_id
-        """,
-        (str(bundle.pre_play_state.play_id), provenance.evidence_observation_id),
-    ).fetchall()
-    expected_participation = sorted(
-        (
-            _participation_observation_id(provenance.observation_id, sequence),
+    for sequence, item in enumerate(bundle.participation, start=1):
+        observation_id = _participation_observation_id(
+            provenance.observation_id,
+            sequence,
+        )
+        row = connection.execute(
+            """
+            SELECT participation_id, evidence_id, evidence_observation_id,
+                   provider_id, provider_revision
+            FROM participation_observations
+            WHERE observation_id = ?
+            """,
+            (observation_id,),
+        ).fetchone()
+        expected = (
             str(item.participation_id),
             provenance.evidence_id,
             provenance.evidence_observation_id,
             bundle.provider_id,
             provenance.provider_revision,
         )
-        for sequence, item in enumerate(bundle.participation, start=1)
-    )
-    if [tuple(row) for row in participation_rows] != expected_participation:
-        raise NormalizedPlayConflictError(
-            "stored participation observations do not match normalized play membership"
-        )
+        if row is None or tuple(row) != expected:
+            raise NormalizedPlayConflictError(
+                "stored participation observation conflicts with normalized membership"
+            )
 
-    penalty_rows = connection.execute(
-        """
-        SELECT observation_id, penalty_id, evidence_id,
-               evidence_observation_id, provider_id, provider_revision
-        FROM penalty_observations
-        WHERE play_id = ? AND evidence_observation_id = ?
-        ORDER BY observation_id
-        """,
-        (str(bundle.pre_play_state.play_id), provenance.evidence_observation_id),
-    ).fetchall()
-    expected_penalties = sorted(
-        (
-            _penalty_observation_id(provenance.observation_id, sequence),
-            str(item.penalty_id),
+    for sequence, penalty in enumerate(bundle.penalties, start=1):
+        observation_id = _penalty_observation_id(provenance.observation_id, sequence)
+        row = connection.execute(
+            """
+            SELECT penalty_id, evidence_id, evidence_observation_id,
+                   provider_id, provider_revision
+            FROM penalty_observations
+            WHERE observation_id = ?
+            """,
+            (observation_id,),
+        ).fetchone()
+        expected = (
+            str(penalty.penalty_id),
             provenance.evidence_id,
             provenance.evidence_observation_id,
             bundle.provider_id,
             provenance.provider_revision,
         )
-        for sequence, item in enumerate(bundle.penalties, start=1)
-    )
-    if [tuple(row) for row in penalty_rows] != expected_penalties:
-        raise NormalizedPlayConflictError(
-            "stored penalty observations do not match normalized play membership"
-        )
+        if row is None or tuple(row) != expected:
+            raise NormalizedPlayConflictError(
+                "stored penalty observation conflicts with normalized membership"
+            )
 
 
 def _insert_participation_observations(
@@ -340,25 +160,11 @@ def _insert_participation_observations(
         connection.execute(
             """
             INSERT INTO participation_observations(
-                observation_id,
-                participation_id,
-                play_id,
-                player_id,
-                team_season_id,
-                evidence_id,
-                evidence_observation_id,
-                provider_id,
-                side,
-                role,
-                on_field,
-                effective_at,
-                published_at,
-                observed_at,
-                ingested_at,
-                available_at,
-                availability_method,
-                availability_confidence,
-                provider_revision
+                observation_id, participation_id, play_id, player_id,
+                team_season_id, evidence_id, evidence_observation_id,
+                provider_id, side, role, on_field, effective_at, published_at,
+                observed_at, ingested_at, available_at, availability_method,
+                availability_confidence, provider_revision
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
@@ -395,29 +201,12 @@ def _insert_penalty_observations(
         connection.execute(
             """
             INSERT INTO penalty_observations(
-                observation_id,
-                penalty_id,
-                play_id,
-                team_season_id,
-                player_id,
-                evidence_id,
-                evidence_observation_id,
-                provider_id,
-                penalty_type,
-                disposition,
-                yards,
-                automatic_first_down,
-                loss_of_down,
-                nullifies_play,
-                enforcement_spot,
-                effective_at,
-                published_at,
-                observed_at,
-                ingested_at,
-                available_at,
-                availability_method,
-                availability_confidence,
-                provider_revision
+                observation_id, penalty_id, play_id, team_season_id, player_id,
+                evidence_id, evidence_observation_id, provider_id, penalty_type,
+                disposition, yards, automatic_first_down, loss_of_down,
+                nullifies_play, enforcement_spot, effective_at, published_at,
+                observed_at, ingested_at, available_at, availability_method,
+                availability_confidence, provider_revision
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
@@ -497,22 +286,11 @@ def record_normalized_play(
         connection.execute(
             """
             INSERT INTO play_observations(
-                observation_id,
-                play_id,
-                evidence_id,
-                evidence_observation_id,
-                provider_id,
-                provider_play_id,
-                provider_revision,
-                normalized_payload_json,
-                normalized_sha256,
-                effective_at,
-                published_at,
-                observed_at,
-                ingested_at,
-                available_at,
-                availability_method,
-                availability_confidence
+                observation_id, play_id, evidence_id, evidence_observation_id,
+                provider_id, provider_play_id, provider_revision,
+                normalized_payload_json, normalized_sha256, effective_at,
+                published_at, observed_at, ingested_at, available_at,
+                availability_method, availability_confidence
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
