@@ -21,7 +21,13 @@ CONTEXT = NflverseGameContext(
 )
 
 
-def _record(*, play_id: str, raw_index: int, yards_to_goal: int, first_down: bool = False) -> NflversePlayRecord:
+def _record(
+    *,
+    play_id: str,
+    raw_index: int,
+    yards_to_goal: int,
+    first_down: bool = False,
+) -> NflversePlayRecord:
     return NflversePlayRecord(
         provider_game_id="2026_01_AWY_HOM",
         provider_play_id=play_id,
