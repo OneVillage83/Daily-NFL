@@ -12,11 +12,7 @@ from dataclasses import dataclass
 
 from daily_nfl.domain import KnowledgeTimestamp
 from daily_nfl.normalization.contracts import NormalizedPlayBundle
-from daily_nfl.normalization.persistence_core import (
-    NormalizedPlayConflictError,
-    _ensure_canonical_rows,
-    _iso,
-)
+from daily_nfl.normalization.persistence_core import NormalizedPlayConflictError
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,11 +47,9 @@ def normalized_play_observation_id(
     provider_play_id: str,
     provider_revision: str | None = None,
 ) -> str:
-    from daily_nfl.normalization.certified_persistence import (
-        normalized_play_observation_id as certified_identity,
-    )
+    import daily_nfl.normalization.certified_persistence as certified_persistence
 
-    return certified_identity(
+    return certified_persistence.normalized_play_observation_id(
         evidence_id=evidence_id,
         evidence_observation_id=evidence_observation_id,
         provider_id=provider_id,
@@ -65,11 +59,9 @@ def normalized_play_observation_id(
 
 
 def serialize_normalized_play(bundle: NormalizedPlayBundle) -> tuple[str, str]:
-    from daily_nfl.normalization.certified_persistence import (
-        serialize_normalized_play as certified_serialize,
-    )
+    import daily_nfl.normalization.certified_persistence as certified_persistence
 
-    return certified_serialize(bundle)
+    return certified_persistence.serialize_normalized_play(bundle)
 
 
 def record_normalized_play(
@@ -77,15 +69,12 @@ def record_normalized_play(
     bundle: NormalizedPlayBundle,
     provenance: NormalizationProvenance,
 ) -> None:
-    from daily_nfl.normalization.certified_persistence import (
-        NormalizationProvenance as CertifiedProvenance,
-        record_normalized_play as certified_record,
-    )
+    import daily_nfl.normalization.certified_persistence as certified_persistence
 
-    certified_record(
+    certified_persistence.record_normalized_play(
         connection,
         bundle,
-        CertifiedProvenance(
+        certified_persistence.NormalizationProvenance(
             observation_id=provenance.observation_id,
             knowledge=provenance.knowledge,
             evidence_id=provenance.evidence_id,
