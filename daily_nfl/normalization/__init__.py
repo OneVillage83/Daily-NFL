@@ -1,5 +1,12 @@
 """Provider-neutral football play normalization for Daily NFL."""
 
+from daily_nfl.normalization.certified_persistence import (
+    NormalizationProvenance,
+    NormalizedPlayConflictError,
+    normalized_play_observation_id,
+    record_normalized_play,
+    serialize_normalized_play,
+)
 from daily_nfl.normalization.contracts import (
     NflverseGameContext,
     NflversePlayRecord,
@@ -15,13 +22,6 @@ from daily_nfl.normalization.nflverse import (
 from daily_nfl.normalization.nflverse_extract import (
     NflverseRowExtractionError,
     extract_nflverse_play_record,
-)
-from daily_nfl.normalization.persistence import (
-    NormalizationProvenance,
-    NormalizedPlayConflictError,
-    normalized_play_observation_id,
-    record_normalized_play,
-    serialize_normalized_play,
 )
 
 __all__ = [
