@@ -127,7 +127,9 @@ The existing single-season M6 nflverse validator was refactored to use the same 
 
 ---
 
-## 5. Gate 0 evidence — 2026-08-24
+## 5. Gate 0 evidence
+
+### Initial run — branch SHA `4120f449700231b7ad7c9d41eaccaa5f2ee68c72`
 
 User-local environment:
 
@@ -136,27 +138,9 @@ Python 3.12.10
 E:\Daily-NFL\.venv\Scripts\python.exe
 ```
 
-Tested branch SHA before static cleanup:
-
-```text
-4120f449700231b7ad7c9d41eaccaa5f2ee68c72
-```
-
-Working tree before tests:
-
-```text
-clean
-```
-
 Focused gate:
 
 ```text
-python -m pytest -q \
-    tests/test_m6c_historical_checkpoint.py \
-    tests/test_nflverse_extraction.py \
-    tests/test_play_normalization.py \
-    tests/test_play_normalization_persistence.py
-
 39 passed in 3.60s
 ```
 
@@ -166,37 +150,49 @@ Full repository gate:
 178 passed in 4.54s
 ```
 
-Ruff result:
+Initial Ruff blocker:
 
 ```text
-BLOCKED — one import-order-only finding
-scripts/run_m6c_historical_checkpoint.py
 I001 import block un-sorted/un-formatted
+scripts/run_m6c_historical_checkpoint.py
 ```
 
-mypy result:
+Initial mypy blocker:
 
 ```text
-BLOCKED — module identity collision
-scripts/run_m6c_historical_checkpoint.py found as both:
+scripts/run_m6c_historical_checkpoint.py found twice as:
   run_m6c_historical_checkpoint
   scripts.run_m6c_historical_checkpoint
 ```
 
+Remediation:
+
+- added `scripts/__init__.py` to establish one explicit package identity;
+- Ruff deterministic import ordering applied locally.
+
+### Static rerun — local HEAD `047b668b4334cb42cc3a4cc0fc72a567cddecb60`
+
+Ruff:
+
+```text
+All checks passed!
+```
+
+Full pytest:
+
+```text
+178 passed in 4.36s
+```
+
+mypy progressed past the package/module-identity collision and exposed eight strict typing errors in `scripts/run_m6c_historical_checkpoint.py` manifest aggregation. Every error is the same class: calling `int(...)` on a value typed as generic `object` from `dict[str, object]` validation/summary documents.
+
 Interpretation:
 
-- behavioral regression gate is green;
-- no historical data should be acquired yet because the exact-head static gate is not green;
-- Ruff finding is formatting/import-order only;
-- mypy finding is Python package/module identity, not domain behavior.
+- this is a static typing contract issue, not a behavioral normalization failure;
+- no M6C real historical acquisition should begin until strict mypy is green;
+- the correct remediation is a fail-closed integer field extractor that validates runtime type, rather than `cast`, `type: ignore`, or weakening mypy.
 
-Remediation initiated:
-
-- add `scripts/__init__.py` so `scripts` is an explicit package and mypy sees one stable module identity;
-- run Ruff deterministic import organization against the M6C runner;
-- rerun Ruff, mypy, and full pytest on the resulting exact head.
-
-Do **not** call Gate 0 closed until those exact-head reruns pass.
+Gate 0 therefore remains **OPEN / BLOCKED ON STRICT TYPING ONLY**.
 
 ---
 
@@ -210,34 +206,33 @@ Do **not** call Gate 0 closed until those exact-head reruns pass.
 6. **Raw-row adjacency remains mandatory.** State-after validation only uses literally adjacent raw rows; surviving extracted rows separated by excluded provider rows are counted as skipped rather than bridged.
 7. **Resume is content/version bound.** A previous PASS is reusable only when summary integrity, raw SHA/evidence, contract version, validator version, and parser version all match.
 8. **M6C does not certify F-6 through F-9.** TeamState, PlayerState, UnitState, CoachingState, and injury/availability state remain M7 work.
+9. **Strict typing remains fail-closed.** Manifest aggregation must validate integer-valued fields explicitly; M6C will not suppress mypy errors with broad casts/ignores simply to advance the checkpoint.
 
 ---
 
 ## 7. Current resume point
 
-Current state at this log creation:
-
 ```text
-M6                    ARCHITECTURE-CERTIFIED
-M6C contract          LOCKED
-M6C implementation    PRESENT ON FEATURE BRANCH
-M6C draft PR          #9 OPEN / DRAFT
-Gate 0 behavior       PASS (39 focused, 178 full)
-Gate 0 Ruff           PENDING CLEANUP RERUN
-Gate 0 mypy           PENDING PACKAGE-FIX RERUN
-Gate A real history   NOT STARTED
-Gate B full history   NOT STARTED
+M6                     ARCHITECTURE-CERTIFIED
+M6C contract           LOCKED
+M6C implementation     PRESENT ON FEATURE BRANCH
+M6C draft PR           #9 OPEN / DRAFT
+Gate 0 behavior        PASS (39 focused, 178 full)
+Gate 0 Ruff            PASS
+Gate 0 mypy            BLOCKED — manifest integer type contract
+Gate A real history    NOT STARTED
+Gate B full history    NOT STARTED
 Gate C reproducibility NOT STARTED
-M6C certification     WITHHELD
-M7                    NOT STARTED
+M6C certification      WITHHELD
+M7                     NOT STARTED
 ```
 
 Next actions:
 
-1. pull latest `checkpoint/m6c-historical-continuation`;
-2. apply Ruff import ordering to `scripts/run_m6c_historical_checkpoint.py`;
+1. sync the latest M6C branch without losing the known local Ruff-only edit;
+2. add a fail-closed integer extractor to the M6C runner and use it for manifest totals;
 3. rerun Ruff + mypy + full pytest;
-4. record exact clean Gate-0 SHA here;
+4. record the exact clean Gate-0 SHA here;
 5. execute Gate A sentinel seasons only;
 6. investigate any REVIEW_REQUIRED/FAIL season before proceeding;
 7. only after Gate A is green, execute Gate B full 1999-2025 sweep;
