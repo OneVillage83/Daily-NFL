@@ -215,19 +215,69 @@ python -m pytest -q
 
 GitHub commit inspection confirms `4a17bb0722efe37603c2856447ba02fd1005f690` changes only `scripts/run_m6c_historical_checkpoint.py` and contains the tested `_required_int` remediation plus Ruff import ordering.
 
-Local post-push status exposed one unrelated untracked artifact:
+The later local run began Gate A from branch head `7a6f409bde9b26a83de4d697bd276a6201b6ef8e` with a clean `git status --short`. That head only advanced documentation after the executable Gate-0 authority, so the M6C runner under test remained the code validated at `4a17bb0722efe37603c2856447ba02fd1005f690`.
 
-```text
-?? "t -q"
-```
-
-This does not invalidate the tested executable commit because it is untracked and not part of the code under test, but Gate 0's clean-worktree requirement is not administratively closed until that file is inspected/removed and `git status --short` is empty.
-
-Gate-0 executable behavior/static analysis is therefore **PASS**, with only clean-tree housekeeping pending.
+Gate 0 is **CLOSED / PASS**.
 
 ---
 
-## 6. Decisions made during M6C setup
+## 6. Gate A era-sentinel evidence
+
+Gate A command:
+
+```text
+python scripts/run_m6c_historical_checkpoint.py \
+    --gate sentinel \
+    --database local-data/m6c/m6c-history.db \
+    --raw-root local-data/m6c/raw \
+    --output-root local-data/m6c/validation
+```
+
+Sentinel status/fingerprint results:
+
+```text
+1999  FAIL  69d402fdf4632aa9ad7e1cb5e25f4e620e362e5fe69efec6a1c8583359c9580d
+2005  PASS  3b47ae76bb66a0b5ebfde29bc731d6514d164e183a04561ccd20f06b2641a9c8
+2010  FAIL  1efce259db3a3a4c4c1bee376d4f28de01e8de36a1f4faa08fcaec1040e6260e
+2015  PASS  ba39026ef7c00a73fab1b44dce6ff041e51eab49350af86a66ffeae4e569b073
+2020  PASS  d4c2920f5a06c135c57e7d1dd0e9b569c9ad577276c3253467ba5ce381375bf5
+2025  PASS  46403a8bfb377acb258789f63cf04dbcebb1df676bd53644a34645e96f95cde4
+```
+
+Aggregate manifest:
+
+```text
+overall_status: FAIL
+season_count: 6
+schema_version: 7
+row_count: 284,449
+extracted_and_normalized_count: 266,862
+extraction_error_count: 17,587
+normalization_error_count: 0
+next_state_adjacent_validated: 251,299
+next_state_nonadjacent_skipped: 13,950
+next_state_error_count: 0
+raw_size_bytes: 106,230,513
+manifest_sha256: 9ede333e978ef19dc5e59a6abd72fe4b2e802f23495bfd1b4964433601b620a5
+```
+
+Interpretation at first failure triage:
+
+- four of six era sentinels are clean PASS;
+- no successfully extracted row failed canonical normalization in any sentinel season;
+- no literally adjacent raw-row state transition failed in any sentinel season;
+- aggregate row accounting balances exactly: `266,862 + 17,587 + 0 = 284,449`;
+- therefore the M6 normalization/state machinery is holding across the sentinel corpus;
+- 1999 and 2010 are blocked by fail-closed historical extraction classification and require row/play-type inspection before any remediation or allowance is approved;
+- Gate B full 1999-2025 sweep is prohibited until both failing sentinels are understood and Gate A is green.
+
+Exact per-season `validation_reasons`, extraction-rejection play-type buckets, and representative rejected rows for 1999/2010 are the next required evidence. No architecture or allowlist change may be made based only on the aggregate counts.
+
+Gate A is **OPEN / BLOCKED — 1999 AND 2010 REQUIRE TRIAGE**.
+
+---
+
+## 7. Decisions made during M6C setup
 
 1. **Raw-first history is authoritative.** M6C validation reads the exact stored parquet asset retained through the certified raw-evidence path.
 2. **Season-addressed acquisition.** PBP acquisition is one explicit season asset at a time so failure/resume/accounting is auditable.
@@ -238,44 +288,49 @@ Gate-0 executable behavior/static analysis is therefore **PASS**, with only clea
 7. **Resume is content/version bound.** A previous PASS is reusable only when summary integrity, raw SHA/evidence, contract version, validator version, and parser version all match.
 8. **M6C does not certify F-6 through F-9.** TeamState, PlayerState, UnitState, CoachingState, and injury/availability state remain M7 work.
 9. **Strict typing remains fail-closed.** Manifest aggregation validates integer-valued fields explicitly; M6C will not suppress mypy errors with broad casts/ignores simply to advance the checkpoint.
+10. **Historical FAIL is investigated before allowlisting.** A provider-era play type/rejection combination is not added to the allowed set merely because it is old or rare; representative rows must show that excluding it preserves the F-5 causal/state contract.
 
 ---
 
-## 7. Current resume point
+## 8. Current resume point
 
 ```text
 M6                     ARCHITECTURE-CERTIFIED
 M6C contract           LOCKED
 M6C implementation     PRESENT ON FEATURE BRANCH
 M6C draft PR           #9 OPEN / DRAFT
-Gate 0 executable      PASS — 4a17bb0722efe37603c2856447ba02fd1005f690
-Gate 0 Ruff            PASS
-Gate 0 mypy            PASS — 95 source files
-Gate 0 pytest          PASS — 178 tests
-Gate 0 clean tree      PENDING — untracked "t -q" artifact
-Gate A real history    NOT STARTED
-Gate B full history    NOT STARTED
-Gate C reproducibility NOT STARTED
-M6C certification      WITHHELD
-M7                     NOT STARTED
+Gate 0                 CLOSED / PASS
+Gate A                  OPEN / BLOCKED
+Gate A 1999             FAIL — TRIAGE REQUIRED
+Gate A 2005             PASS
+Gate A 2010             FAIL — TRIAGE REQUIRED
+Gate A 2015             PASS
+Gate A 2020             PASS
+Gate A 2025             PASS
+Gate B full history     NOT STARTED
+Gate C reproducibility  NOT STARTED
+M6C certification       WITHHELD
+M7                      NOT STARTED
 ```
 
 Next actions:
 
-1. inspect/remove the untracked `t -q` artifact and verify a clean worktree;
-2. pull any documentation-only branch update while preserving executable authority at `4a17bb0722efe37603c2856447ba02fd1005f690`;
-3. record clean-tree closure for Gate 0;
-4. execute Gate A sentinel seasons only: 1999, 2005, 2010, 2015, 2020, 2025;
-5. investigate any REVIEW_REQUIRED/FAIL season before proceeding;
-6. only after Gate A is green, execute Gate B full 1999-2025 sweep;
-7. run Gate C resume/revalidation proof;
-8. produce final M6C evidence/certification docs and update authoritative certification state;
-9. review/squash-merge PR #9 pinned to exact final head;
-10. begin M7 only after M6C closes.
+1. inspect `season-1999.json` and `season-2010.json` validation reasons;
+2. print extraction-error play-type buckets for both failing seasons;
+3. inspect representative rejected rows for every disallowed play-type/reason pair;
+4. determine whether each case is provider schema drift, a legitimate canonical extraction gap, or a safely non-state-bearing row;
+5. remediate or explicitly approve only evidence-backed exclusions;
+6. rerun 1999 and 2010 from stored raw bytes;
+7. rerun all six Gate-A sentinels after any executable change;
+8. only after Gate A is fully PASS, execute Gate B full 1999-2025 sweep;
+9. run Gate C resume/revalidation proof;
+10. produce final M6C evidence/certification docs and update authoritative certification state;
+11. review/squash-merge PR #9 pinned to exact final head;
+12. begin M7 only after M6C closes.
 
 ---
 
-## 8. Update rule
+## 9. Update rule
 
 Append or revise this file whenever any of the following occurs:
 
