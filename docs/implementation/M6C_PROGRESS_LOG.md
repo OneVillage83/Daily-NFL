@@ -184,15 +184,46 @@ Full pytest:
 178 passed in 4.36s
 ```
 
-mypy progressed past the package/module-identity collision and exposed eight strict typing errors in `scripts/run_m6c_historical_checkpoint.py` manifest aggregation. Every error is the same class: calling `int(...)` on a value typed as generic `object` from `dict[str, object]` validation/summary documents.
+mypy progressed past the package/module-identity collision and exposed eight strict typing errors in `scripts/run_m6c_historical_checkpoint.py` manifest aggregation. Every error was the same class: calling `int(...)` on a value typed as generic `object` from `dict[str, object]` validation/summary documents.
 
 Interpretation:
 
-- this is a static typing contract issue, not a behavioral normalization failure;
-- no M6C real historical acquisition should begin until strict mypy is green;
-- the correct remediation is a fail-closed integer field extractor that validates runtime type, rather than `cast`, `type: ignore`, or weakening mypy.
+- this was a static typing contract issue, not a behavioral normalization failure;
+- the remediation must validate the runtime type rather than weaken mypy.
 
-Gate 0 therefore remains **OPEN / BLOCKED ON STRICT TYPING ONLY**.
+### Exact executable Gate-0 pass — `4a17bb0722efe37603c2856447ba02fd1005f690`
+
+Remediation committed:
+
+- added fail-closed `_required_int(document, key)` validation;
+- booleans and non-integers are rejected explicitly;
+- manifest totals now consume only validated integer fields;
+- Ruff import ordering included in the same executable commit.
+
+Exact-head quality gate:
+
+```text
+python -m ruff check .
+All checks passed!
+
+python -m mypy .
+Success: no issues found in 95 source files
+
+python -m pytest -q
+178 passed in 6.95s
+```
+
+GitHub commit inspection confirms `4a17bb0722efe37603c2856447ba02fd1005f690` changes only `scripts/run_m6c_historical_checkpoint.py` and contains the tested `_required_int` remediation plus Ruff import ordering.
+
+Local post-push status exposed one unrelated untracked artifact:
+
+```text
+?? "t -q"
+```
+
+This does not invalidate the tested executable commit because it is untracked and not part of the code under test, but Gate 0's clean-worktree requirement is not administratively closed until that file is inspected/removed and `git status --short` is empty.
+
+Gate-0 executable behavior/static analysis is therefore **PASS**, with only clean-tree housekeeping pending.
 
 ---
 
@@ -206,7 +237,7 @@ Gate 0 therefore remains **OPEN / BLOCKED ON STRICT TYPING ONLY**.
 6. **Raw-row adjacency remains mandatory.** State-after validation only uses literally adjacent raw rows; surviving extracted rows separated by excluded provider rows are counted as skipped rather than bridged.
 7. **Resume is content/version bound.** A previous PASS is reusable only when summary integrity, raw SHA/evidence, contract version, validator version, and parser version all match.
 8. **M6C does not certify F-6 through F-9.** TeamState, PlayerState, UnitState, CoachingState, and injury/availability state remain M7 work.
-9. **Strict typing remains fail-closed.** Manifest aggregation must validate integer-valued fields explicitly; M6C will not suppress mypy errors with broad casts/ignores simply to advance the checkpoint.
+9. **Strict typing remains fail-closed.** Manifest aggregation validates integer-valued fields explicitly; M6C will not suppress mypy errors with broad casts/ignores simply to advance the checkpoint.
 
 ---
 
@@ -217,9 +248,11 @@ M6                     ARCHITECTURE-CERTIFIED
 M6C contract           LOCKED
 M6C implementation     PRESENT ON FEATURE BRANCH
 M6C draft PR           #9 OPEN / DRAFT
-Gate 0 behavior        PASS (39 focused, 178 full)
+Gate 0 executable      PASS — 4a17bb0722efe37603c2856447ba02fd1005f690
 Gate 0 Ruff            PASS
-Gate 0 mypy            BLOCKED — manifest integer type contract
+Gate 0 mypy            PASS — 95 source files
+Gate 0 pytest          PASS — 178 tests
+Gate 0 clean tree      PENDING — untracked "t -q" artifact
 Gate A real history    NOT STARTED
 Gate B full history    NOT STARTED
 Gate C reproducibility NOT STARTED
@@ -229,17 +262,16 @@ M7                     NOT STARTED
 
 Next actions:
 
-1. sync the latest M6C branch without losing the known local Ruff-only edit;
-2. add a fail-closed integer extractor to the M6C runner and use it for manifest totals;
-3. rerun Ruff + mypy + full pytest;
-4. record the exact clean Gate-0 SHA here;
-5. execute Gate A sentinel seasons only;
-6. investigate any REVIEW_REQUIRED/FAIL season before proceeding;
-7. only after Gate A is green, execute Gate B full 1999-2025 sweep;
-8. run Gate C resume/revalidation proof;
-9. produce final M6C evidence/certification docs and update authoritative certification state;
-10. review/squash-merge PR #9 pinned to exact final head;
-11. begin M7 only after M6C closes.
+1. inspect/remove the untracked `t -q` artifact and verify a clean worktree;
+2. pull any documentation-only branch update while preserving executable authority at `4a17bb0722efe37603c2856447ba02fd1005f690`;
+3. record clean-tree closure for Gate 0;
+4. execute Gate A sentinel seasons only: 1999, 2005, 2010, 2015, 2020, 2025;
+5. investigate any REVIEW_REQUIRED/FAIL season before proceeding;
+6. only after Gate A is green, execute Gate B full 1999-2025 sweep;
+7. run Gate C resume/revalidation proof;
+8. produce final M6C evidence/certification docs and update authoritative certification state;
+9. review/squash-merge PR #9 pinned to exact final head;
+10. begin M7 only after M6C closes.
 
 ---
 
