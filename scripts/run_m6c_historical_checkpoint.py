@@ -20,11 +20,11 @@ if str(REPOSITORY_ROOT) not in sys.path:
 
 from daily_nfl.persistence import apply_migrations, open_database  # noqa: E402
 from daily_nfl.providers import (  # noqa: E402
+    NFLVERSE_DESCRIPTOR,
     AcquisitionRequest,
     AcquisitionService,
     DatasetKind,
     FileSystemRawEvidenceStore,
-    NFLVERSE_DESCRIPTOR,
     NflverseAdapter,
     NflverseHttpLoader,
     record_stored_acquisition,
@@ -358,6 +358,13 @@ def _validate_raw_season(
     return document
 
 
+def _required_int(document: dict[str, object], key: str) -> int:
+    value = document.get(key)
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise TypeError(f"{key} must be an integer")
+    return value
+
+
 def _status_rank(value: str) -> int:
     return {
         M6CStatus.PASS.value: 0,
@@ -380,26 +387,26 @@ def _build_manifest(
     validations = [cast(dict[str, object], summary["validation"]) for summary in summaries]
 
     totals = {
-        "row_count": sum(int(item["row_count"]) for item in validations),
+        "row_count": sum(_required_int(item, "row_count") for item in validations),
         "extracted_and_normalized_count": sum(
-            int(item["extracted_and_normalized_count"]) for item in validations
+            _required_int(item, "extracted_and_normalized_count") for item in validations
         ),
         "extraction_error_count": sum(
-            int(item["extraction_error_count"]) for item in validations
+            _required_int(item, "extraction_error_count") for item in validations
         ),
         "normalization_error_count": sum(
-            int(item["normalization_error_count"]) for item in validations
+            _required_int(item, "normalization_error_count") for item in validations
         ),
         "next_state_adjacent_validated": sum(
-            int(item["next_state_adjacent_validated"]) for item in validations
+            _required_int(item, "next_state_adjacent_validated") for item in validations
         ),
         "next_state_nonadjacent_skipped": sum(
-            int(item["next_state_nonadjacent_skipped"]) for item in validations
+            _required_int(item, "next_state_nonadjacent_skipped") for item in validations
         ),
         "next_state_error_count": sum(
-            int(item["next_state_error_count"]) for item in validations
+            _required_int(item, "next_state_error_count") for item in validations
         ),
-        "raw_size_bytes": sum(int(summary["raw_size_bytes"]) for summary in summaries),
+        "raw_size_bytes": sum(_required_int(summary, "raw_size_bytes") for summary in summaries),
     }
     manifest: dict[str, object] = {
         "contract_version": M6C_CONTRACT_VERSION,
