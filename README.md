@@ -13,10 +13,13 @@ Daily NFL is the NFL modeling engine for **The Daily Line**. Its governing archi
 - M5 Historical PIT Engine: **ARCHITECTURE-CERTIFIED**
 - M6 Canonical Play / Drive Normalization: **ARCHITECTURE-CERTIFIED**
 - M6B real nflverse PBP validation: completed; corrected raw-row-adjacency evidence is incorporated into M6 certification
-- M6C controlled historical continuation: **next checkpoint**
+- M6C Controlled Historical Continuation / Full Historical Compatibility: **IN PROGRESS** on draft PR #9
+- M6C running resume/evidence log: `docs/implementation/M6C_PROGRESS_LOG.md`
+- M6C locked checkpoint contract: `docs/implementation/M6C_HISTORICAL_CONTINUATION_CONTRACT.md`
+- M7 State Engine V1: starts only after M6C closes
 - M6 certification evidence: `docs/implementation/M6_ARCHITECTURE_CONFORMANCE_AUDIT.md` and `docs/implementation/M6_LOCAL_VALIDATION_20260823.md`
 
-The current certification authority is `docs/implementation/ARCHITECTURE_CERTIFICATION_LOG.md`. The older `PROJECT_CHECKPOINT_LOG.md` remains a historical implementation snapshot from before the formal certification sequence and is not allowed to override newer certification status.
+The current certification authority is `docs/implementation/ARCHITECTURE_CERTIFICATION_LOG.md`. During an active checkpoint, the checkpoint-specific progress log is the authoritative resume point for unfinished work. The older `PROJECT_CHECKPOINT_LOG.md` remains a historical implementation snapshot from before the formal certification sequence and is not allowed to override newer certification/progress status.
 
 ## Engineering baseline
 
@@ -96,6 +99,14 @@ Implementation roadmap:
 Architecture certification log:
 
 - `docs/implementation/ARCHITECTURE_CERTIFICATION_LOG.md`
+
+Active M6C resume/progress log:
+
+- `docs/implementation/M6C_PROGRESS_LOG.md`
+
+M6C checkpoint contract:
+
+- `docs/implementation/M6C_HISTORICAL_CONTINUATION_CONTRACT.md`
 
 Historical consolidated checkpoint:
 
