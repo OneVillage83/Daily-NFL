@@ -1,9 +1,9 @@
 # M6C Gate A Remediation Decision — Historical PBP Compatibility
 
-**Project:** The Daily Line — Daily NFL  
-**Checkpoint:** M6C — Controlled Historical Continuation / Full Historical Compatibility  
-**Status:** REMEDIATION APPROVED FOR IMPLEMENTATION / VALIDATION PENDING  
-**Source Gate-A executable authority:** `4a17bb0722efe37603c2856447ba02fd1005f690`  
+**Project:** The Daily Line — Daily NFL
+**Checkpoint:** M6C — Controlled Historical Continuation / Full Historical Compatibility
+**Status:** REMEDIATION APPROVED FOR IMPLEMENTATION / VALIDATION PENDING
+**Source Gate-A executable authority:** `4a17bb0722efe37603c2856447ba02fd1005f690`
 **Source failing fingerprints:** 1999 `69d402fdf4632aa9ad7e1cb5e25f4e620e362e5fe69efec6a1c8583359c9580d`; 2010 `1efce259db3a3a4c4c1bee376d4f28de01e8de36a1f4faa08fcaec1040e6260e`
 
 This document records the evidence-backed remediation decision reached after full raw-row inspection of the two failing Gate-A sentinel seasons. It does not certify the remediation. Gate A remains blocked until executable changes pass focused tests, Ruff, strict mypy, full pytest, and a complete six-sentinel revalidation from the stored raw artifacts.

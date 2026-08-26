@@ -1,10 +1,10 @@
 # M6C Gate A Closure — Era Sentinels
 
-**Project:** The Daily Line — Daily NFL  
-**Checkpoint:** M6C — Controlled Historical Continuation / Full Historical Compatibility  
-**Status:** GATE A CLOSED / PASS  
-**Exact executable authority:** `d4c3e14c2a3cd9c40dd33a9a2acc9c75d7b4dfd0`  
-**Validator:** `M6C_PBP_VALIDATOR_V3`  
+**Project:** The Daily Line — Daily NFL
+**Checkpoint:** M6C — Controlled Historical Continuation / Full Historical Compatibility
+**Status:** GATE A CLOSED / PASS
+**Exact executable authority:** `d4c3e14c2a3cd9c40dd33a9a2acc9c75d7b4dfd0`
+**Validator:** `M6C_PBP_VALIDATOR_V3`
 **Certified M6 base:** `7815873d97b3233e0d67f7e16b8315b8c02d44ef`
 
 ## 1. Exact-head quality gate

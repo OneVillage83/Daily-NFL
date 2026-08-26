@@ -1,9 +1,9 @@
 # M6C Gate A V2 — 2010 Hard-Reject Isolation
 
-**Project:** The Daily Line — Daily NFL  
-**Checkpoint:** M6C — Controlled Historical Continuation / Full Historical Compatibility  
-**Status:** TRIAGE CLOSED — REMEDIATION APPROVED  
-**Executable authority under diagnosis:** `695f30f175cf70468c38b79e4150592b6ed692a9`  
+**Project:** The Daily Line — Daily NFL
+**Checkpoint:** M6C — Controlled Historical Continuation / Full Historical Compatibility
+**Status:** TRIAGE CLOSED — REMEDIATION APPROVED
+**Executable authority under diagnosis:** `695f30f175cf70468c38b79e4150592b6ed692a9`
 **Validator:** `M6C_PBP_VALIDATOR_V2`
 
 ## 1. 2010 V2 summary
