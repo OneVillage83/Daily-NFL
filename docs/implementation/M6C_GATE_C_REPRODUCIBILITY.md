@@ -2,9 +2,10 @@
 
 **Project:** The Daily Line — Daily NFL  
 **Checkpoint:** M6C — Controlled Historical Continuation / Full Historical Compatibility  
-**Status:** IN PROGRESS — C-1/C-2 PASS; execution/acquisition metadata separation requires remediation  
-**Executable authority:** `d4c3e14c2a3cd9c40dd33a9a2acc9c75d7b4dfd0`  
-**Validator:** `M6C_PBP_VALIDATOR_V3`
+**Status:** IN PROGRESS — C-1/C-2 PASS; negative/idempotency proofs remain  
+**Runner/provenance authority:** `19df3e5e8fc648a2071d94f1f2c310fb7033fac2`  
+**Validator:** `M6C_PBP_VALIDATOR_V3`  
+**Validator semantics authority:** `d4c3e14c2a3cd9c40dd33a9a2acc9c75d7b4dfd0`
 
 ## Gate C requirements
 
@@ -15,19 +16,48 @@ M6C requires proof that:
 - resumable PASS summaries are accepted only when integrity/version/raw identity match;
 - corrupt or stale summaries are rejected;
 - explicit revalidation reproduces the same validation fingerprint;
-- forced reacquisition may append an acquisition observation without rewriting immutable raw evidence.
+- evidence acquisition provenance is not conflated with current execution behavior;
+- forced reacquisition may append a new acquisition observation without rewriting immutable raw evidence.
+
+## Exact-head runner validation
+
+Commit `19df3e5e8fc648a2071d94f1f2c310fb7033fac2` separates immutable raw acquisition provenance from per-run execution mode.
+
+Environment:
+
+```text
+Python 3.12.10
+E:\Daily-NFL\.venv\Scripts\python.exe
+```
+
+Quality gate:
+
+```text
+focused M6/M6C tests: 49 passed
+Ruff: PASS
+mypy: PASS — 95 source files
+full pytest: 188 passed
+git diff --check: PASS
+working tree: clean
+```
+
+The runner now leaves the integrity-bound season summary unchanged and emits current behavior separately as `execution_mode`.
 
 ## C-1 — resumable PASS on 2025
 
-Command omitted `--revalidate` and reused the existing valid V3 season summary.
-
-Observed:
+Observed after the runner/provenance remediation:
 
 ```text
 season: 2025
 status: PASS
-acquisition_mode: RESUMED_VALIDATION
+acquisition_mode: REUSED_RAW
+execution_mode: RESUMED_VALIDATION
 validation_fingerprint: d66f08ec2dbd884ba611af590b51c83251fb3cbda1964cfee6f72b9f6b6b8f8e
+```
+
+Aggregate one-season totals remained:
+
+```text
 row_count: 48,771
 extracted_and_normalized_count: 45,196
 extraction_error_count: 3,575
@@ -35,13 +65,12 @@ normalization_error_count: 0
 next_state_adjacent_validated: 41,975
 next_state_nonadjacent_skipped: 2,936
 next_state_error_count: 0
+raw_size_bytes: 20,337,029
 ```
 
-C-1 result: **PASS**. The summary satisfied the integrity/version/raw-identity resume gate.
+C-1 result: **PASS**. A valid integrity/version/raw-bound V3 summary is resumed without mutating acquisition provenance.
 
 ## C-2 — explicit stored-raw revalidation on 2025
-
-Command used `--revalidate` against the same stored raw evidence.
 
 Observed:
 
@@ -49,15 +78,13 @@ Observed:
 season: 2025
 status: PASS
 acquisition_mode: REUSED_RAW
+execution_mode: REVALIDATED
 validation_fingerprint: d66f08ec2dbd884ba611af590b51c83251fb3cbda1964cfee6f72b9f6b6b8f8e
-previous_validation_fingerprint: d66f08ec2dbd884ba611af590b51c83251fb3cbda1964cfee6f72b9f6b6b8f8e
-reproducibility_match: True
 ```
 
-Persisted summary identity:
+Persisted summary after revalidation:
 
 ```text
-contract_version: M6C_HISTORICAL_CHECKPOINT_V1
 validator_version: M6C_PBP_VALIDATOR_V3
 season: 2025
 evidence_id: b83076e5593cc4843132e29be86160e3fdcd668b0724d3ae20fc4c2bff8fbac3
@@ -71,28 +98,34 @@ reproducibility_match: True
 summary_sha256: 571e801f67d547fb503ef3dc4193eecf43b7eb8728dc4d16a1e6d02737427b65
 ```
 
-C-2 result: **PASS**. The exact validation fingerprint reproduced from the same stored raw artifact.
+Current manifest season entry correctly separates:
 
-## Manifest SHA note
+```text
+acquisition_mode: REUSED_RAW
+execution_mode: REVALIDATED
+reproducibility_match: True
+```
 
-The one-season resume manifest and revalidation manifest have different SHA-256 values because current runner metadata differs between execution paths:
+C-2 result: **PASS**. Exact validation output reproduced from the same stored raw artifact, and acquisition provenance remained distinct from execution behavior.
 
-- resume path mutates the loaded summary in memory to `acquisition_mode = RESUMED_VALIDATION`;
-- explicit revalidation persists `acquisition_mode = REUSED_RAW` and sets prior-fingerprint/reproducibility metadata.
+## Manifest SHA interpretation
 
-This does not indicate football-data drift: the validation fingerprint is identical. However, the current runner overloads the field `acquisition_mode` to represent both evidence acquisition provenance and current execution behavior.
+Different execution paths legitimately produce different aggregate manifest SHA-256 values because `execution_mode` and reproducibility metadata are part of the manifest. The validation fingerprint is the stable football-validation identity and remained unchanged.
 
-## Open remediation before Gate C closure
+## Raw-store idempotency contract
 
-The persisted season summary is integrity-bound and correctly retains the evidence acquisition provenance (`REUSED_RAW`). On the resume path the runner mutates only the in-memory loaded summary to `RESUMED_VALIDATION` without recomputing or persisting `summary_sha256`.
+`FileSystemRawEvidenceStore` is content-addressed by SHA-256. It attempts exclusive creation and, when an object already exists, verifies that the existing bytes and digest match rather than rewriting the object. Therefore a forced reacquisition of identical upstream bytes should retain the same evidence ID/path/SHA while allowing a new acquisition observation.
 
-Although this does not corrupt the stored summary, it creates semantic ambiguity between:
+## Remaining C-3/C-4 work
 
-1. immutable evidence acquisition provenance; and
-2. current checkpoint execution mode.
+Before Gate C can close:
 
-Gate C will not close with that ambiguity. The runner should preserve `acquisition_mode` as immutable evidence provenance and represent the current run separately, e.g. `execution_mode = RESUMED_VALIDATION` versus `execution_mode = REVALIDATED`/`VALIDATED`.
+1. prove corrupt summary integrity is rejected;
+2. prove stale validator/version metadata is rejected even with internally valid summary integrity;
+3. prove mismatched raw identity is rejected even with internally valid summary integrity;
+4. force reacquisition of 2025 and prove immutable raw evidence identity/content is unchanged while a new acquisition observation is recorded;
+5. restore/confirm a normal resume remains PASS after those checks.
 
-After this narrow remediation, rerun focused/full quality gates and repeat C-1/C-2 before corruption-rejection and forced-reacquisition proofs.
+All destructive-negative summary tests must use isolated output directories and must not alter the authoritative `local-data/m6c/validation/season-2025.json`.
 
-Gate C remains **OPEN / IN PROGRESS**. Gate B remains unlocked but should not start until this runner semantics issue is resolved.
+Gate C remains **OPEN / IN PROGRESS**. Gate B is unlocked but intentionally deferred until Gate C closes.
