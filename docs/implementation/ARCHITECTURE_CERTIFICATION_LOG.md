@@ -42,8 +42,8 @@ M4  Identity & Reconciliation Engine                   ARCHITECTURE-CERTIFIED
 M5  Historical PIT Engine                              ARCHITECTURE-CERTIFIED
 M6  Canonical Play / Drive Normalization               ARCHITECTURE-CERTIFIED
 M6B Real nflverse PBP Validation                       COMPLETED / CORRECTED EVIDENCE INCORPORATED INTO M6 CERTIFICATION
-M6C Controlled historical continuation                NOT STARTED — NEXT CHECKPOINT
-M7  State Engine V1                                    NOT STARTED
+M6C Controlled historical continuation                ARCHITECTURE-CERTIFIED
+M7  State Engine V1                                    NOT STARTED — NEXT
 ```
 
 ---
@@ -549,11 +549,58 @@ Documentation/status commits after `5f1e2efe115c8f889d99eb7f6169050ee90c8ca7` do
 
 ---
 
+## 2026-08-26 — M6C Certified
+
+**Milestone:** Controlled Historical Continuation / Full Historical Compatibility
+**Architecture compatibility:** F-2, F-3, F-4, F-5
+**PR:** #9
+**Certified M6 base:** 7815873d97b3233e0d67f7e16b8315b8c02d44ef
+**Validator semantics authority:** d4c3e14c2a3cd9c40dd33a9a2acc9c75d7b4dfd0
+**Runner/provenance authority:** 98aba116a80c51c6dc9f05d602f5bc41e68188e6
+**Validator:** M6C_PBP_VALIDATOR_V3
+
+M6C proves full historical compatibility of the certified M3-M6 stack across nflverse PBP seasons 1999-2025 without fabricating production historical PlayerIds.
+
+```text
+Gate 0: PASS
+Gate A: PASS
+Gate B: PASS — 27 / 27 seasons
+Gate C: PASS
+rows: 1,279,628
+normalized: 1,195,503
+extraction exclusions: 84,125
+normalization errors: 0
+adjacent transitions validated: 1,120,141
+next-state errors: 0
+full pytest: 189 passed
+Ruff: PASS
+strict mypy: PASS — 95 source files
+SQLite: 0 -> 7 / 7 -> 7
+```
+
+Evidence:
+- docs/implementation/M6C_ARCHITECTURE_CONFORMANCE_AUDIT.md
+- docs/implementation/M6C_LOCAL_VALIDATION_20260826.md
+- docs/implementation/M6C_GATE_A_CLOSURE.md
+- docs/implementation/M6C_GATE_B_FULL_HISTORY_RESULT.md
+- docs/implementation/M6C_GATE_C_REPRODUCIBILITY.md
+
+M6C does not certify F-6 through F-9. TeamState, PlayerState, UnitState, CoachingState, injury/availability state, and related state engines remain M7 work.
+
+Final state:
+
+```text
+M6C — ARCHITECTURE-CERTIFIED
+```
+
+---
+
 ## Next Checkpoint
 
 ```text
-M6C — Controlled historical continuation / full historical checkpoint
-Dependencies: certified M0-M6 foundations
+M7 — State Engine V1
+Architecture: F-6 through F-9
+Dependencies: certified M0-M6 plus M6C historical compatibility
 ```
 
-M6C may now consume the certified M6 canonical play/drive contract. It must not silently broaden into F-6 through F-9 state-engine certification; TeamState, PlayerState, UnitState, and CoachingState remain M7 architecture work.
+M7 may begin only after PR #9 is squash-merged to main.
