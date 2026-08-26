@@ -2,7 +2,7 @@
 
 **Project:** The Daily Line — Daily NFL
 **Checkpoint:** M6C — Controlled Historical Continuation / Full Historical Compatibility
-**Status:** IN PROGRESS
+**Status:** ARCHITECTURE-CERTIFIED — PR #9 MERGE PENDING
 **Branch:** `checkpoint/m6c-historical-continuation`
 **Draft PR:** #9
 **Certified M6 base:** `7815873d97b3233e0d67f7e16b8315b8c02d44ef`
@@ -294,39 +294,36 @@ Gate A is **OPEN / BLOCKED — 1999 AND 2010 REQUIRE TRIAGE**.
 
 ## 8. Current resume point
 
-```text
+`	ext
 M6                     ARCHITECTURE-CERTIFIED
-M6C contract           LOCKED
-M6C implementation     PRESENT ON FEATURE BRANCH
-M6C draft PR           #9 OPEN / DRAFT
+M6C contract           SATISFIED
+M6C implementation     COMPLETE
+M6C PR                 #9 OPEN / DRAFT — MERGE PENDING
 Gate 0                 CLOSED / PASS
-Gate A                  OPEN / BLOCKED
-Gate A 1999             FAIL — TRIAGE REQUIRED
-Gate A 2005             PASS
-Gate A 2010             FAIL — TRIAGE REQUIRED
-Gate A 2015             PASS
-Gate A 2020             PASS
-Gate A 2025             PASS
-Gate B full history     NOT STARTED
-Gate C reproducibility  NOT STARTED
-M6C certification       WITHHELD
-M7                      NOT STARTED
-```
+Gate A                 CLOSED / PASS
+Gate B full history    CLOSED / PASS — 27 / 27 seasons
+Gate C reproducibility CLOSED / PASS
+Legacy M6 regression   PASS
+SQLite schema gate     PASS — 0 -> 7 / 7 -> 7
+Focused tests          PASS — 50
+Ruff                   PASS
+strict mypy            PASS — 95 source files
+full pytest            PASS — 189
+PR-range hygiene       PASS
+M6C certification      ARCHITECTURE-CERTIFIED
+M7                     NOT STARTED — NEXT AFTER PR #9 MERGES
+`
 
-Next actions:
+Full-history manifest: 28c45a371c2c85926444c92808385f993595c9cdb8fecc5973338393c450634
 
-1. inspect `season-1999.json` and `season-2010.json` validation reasons;
-2. print extraction-error play-type buckets for both failing seasons;
-3. inspect representative rejected rows for every disallowed play-type/reason pair;
-4. determine whether each case is provider schema drift, a legitimate canonical extraction gap, or a safely non-state-bearing row;
-5. remediate or explicitly approve only evidence-backed exclusions;
-6. rerun 1999 and 2010 from stored raw bytes;
-7. rerun all six Gate-A sentinels after any executable change;
-8. only after Gate A is fully PASS, execute Gate B full 1999-2025 sweep;
-9. run Gate C resume/revalidation proof;
-10. produce final M6C evidence/certification docs and update authoritative certification state;
-11. review/squash-merge PR #9 pinned to exact final head;
-12. begin M7 only after M6C closes.
+Final evidence:
+- docs/implementation/M6C_ARCHITECTURE_CONFORMANCE_AUDIT.md
+- docs/implementation/M6C_LOCAL_VALIDATION_20260826.md
+- docs/implementation/M6C_GATE_A_CLOSURE.md
+- docs/implementation/M6C_GATE_B_FULL_HISTORY_RESULT.md
+- docs/implementation/M6C_GATE_C_REPRODUCIBILITY.md
+
+No executable work remains in M6C. PR #9 must be merged before M7 begins.
 
 ---
 
