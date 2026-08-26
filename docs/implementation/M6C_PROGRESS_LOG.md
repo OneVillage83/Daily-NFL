@@ -294,7 +294,7 @@ Gate A is **OPEN / BLOCKED — 1999 AND 2010 REQUIRE TRIAGE**.
 
 ## 8. Current resume point
 
-`	ext
+```text
 M6                     ARCHITECTURE-CERTIFIED
 M6C contract           SATISFIED
 M6C implementation     COMPLETE
@@ -312,16 +312,16 @@ full pytest            PASS — 189
 PR-range hygiene       PASS
 M6C certification      ARCHITECTURE-CERTIFIED
 M7                     NOT STARTED — NEXT AFTER PR #9 MERGES
-`
+```
 
-Full-history manifest: 28c45a371c2c85926444c92808385f993595c9cdb8fecc5973338393c450634
+Full-history manifest: `e28c45a371c2c85926444c92808385f993595c9cdb8fecc5973338393c450634`
 
 Final evidence:
-- docs/implementation/M6C_ARCHITECTURE_CONFORMANCE_AUDIT.md
-- docs/implementation/M6C_LOCAL_VALIDATION_20260826.md
-- docs/implementation/M6C_GATE_A_CLOSURE.md
-- docs/implementation/M6C_GATE_B_FULL_HISTORY_RESULT.md
-- docs/implementation/M6C_GATE_C_REPRODUCIBILITY.md
+- `docs/implementation/M6C_ARCHITECTURE_CONFORMANCE_AUDIT.md`
+- `docs/implementation/M6C_LOCAL_VALIDATION_20260826.md`
+- `docs/implementation/M6C_GATE_A_CLOSURE.md`
+- `docs/implementation/M6C_GATE_B_FULL_HISTORY_RESULT.md`
+- `docs/implementation/M6C_GATE_C_REPRODUCIBILITY.md`
 
 No executable work remains in M6C. PR #9 must be merged before M7 begins.
 
