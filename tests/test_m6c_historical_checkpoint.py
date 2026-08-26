@@ -10,6 +10,7 @@ from daily_nfl.validation import (
     classify_m6c_validation,
     document_sha256,
 )
+from daily_nfl.validation.nflverse_pbp import _rejected_action_family
 from scripts.run_m6c_historical_checkpoint import (
     RawSeasonEvidence,
     _resolve_seasons,
@@ -105,6 +106,53 @@ def test_m6c_null_play_type_cannot_hide_rejected_core_action() -> None:
         "excluded core action_family 'RUSH'" in reason_text
         for reason_text in reasons
     )
+
+
+def _initial_review_placeholder(
+    **overrides: object,
+) -> dict[str, object]:
+    row: dict[str, object] = {
+        "game_id": "2010_01_DEN_JAX",
+        "play_id": 1.0,
+        "play_type": None,
+        "desc": "*** play under review ***",
+        "qtr": 1.0,
+        "quarter_seconds_remaining": None,
+        "yardline_100": None,
+        "posteam_score": None,
+        "defteam_score": None,
+        "kickoff_attempt": 1.0,
+    }
+    row.update(overrides)
+    return row
+
+
+def test_m6c_initial_review_placeholder_is_administrative() -> None:
+    row = _initial_review_placeholder()
+
+    assert _rejected_action_family(row) == "ADMINISTRATIVE"
+
+
+def test_m6c_review_placeholder_with_real_clock_stays_kickoff() -> None:
+    row = _initial_review_placeholder(
+        quarter_seconds_remaining=900.0,
+    )
+
+    assert _rejected_action_family(row) == "KICKOFF"
+
+
+def test_m6c_real_opening_kickoff_stays_kickoff() -> None:
+    row = _initial_review_placeholder(
+        play_id=39.0,
+        play_type="kickoff",
+        desc="10-J.Scobee kicks 67 yards from JAX 30 to DEN 3.",
+        quarter_seconds_remaining=900.0,
+        yardline_100=30.0,
+        posteam_score=0.0,
+        defteam_score=0.0,
+    )
+
+    assert _rejected_action_family(row) == "KICKOFF"
 
 
 def test_m6c_normalization_or_state_error_fails() -> None:

@@ -124,8 +124,34 @@ def _raw_flag(row: dict[str, object], key: str) -> bool:
     return text in {"1", "true", "yes"}
 
 
+def _raw_missing(row: dict[str, object], key: str) -> bool:
+    value = row.get(key)
+    return value is None or (
+        isinstance(value, float) and math.isnan(value)
+    )
+
+
+def _is_initial_review_placeholder(row: dict[str, object]) -> bool:
+    """Identify the exact audited 2010 provider review-placeholder shape."""
+
+    return (
+        str(row.get("desc") or "").strip() == "*** play under review ***"
+        and row.get("play_id") == 1
+        and not str(row.get("play_type") or "").strip()
+        and row.get("qtr") == 1
+        and _raw_missing(row, "quarter_seconds_remaining")
+        and _raw_missing(row, "yardline_100")
+        and _raw_missing(row, "posteam_score")
+        and _raw_missing(row, "defteam_score")
+        and _raw_flag(row, "kickoff_attempt")
+    )
+
+
 def _rejected_action_family(row: dict[str, object]) -> str:
     """Classify rejected rows from structured provider facts when possible."""
+
+    if _is_initial_review_placeholder(row):
+        return "ADMINISTRATIVE"
 
     hint = str(row.get("play_type") or "").strip().lower().replace("-", "_")
 
