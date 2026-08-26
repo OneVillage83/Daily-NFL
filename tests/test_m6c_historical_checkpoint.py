@@ -21,6 +21,7 @@ def _result(
     *,
     extraction_errors: dict[str, int] | None = None,
     play_types: dict[str, dict[str, int]] | None = None,
+    action_types: dict[str, dict[str, int]] | None = None,
     normalization_errors: int = 0,
     next_state_errors: int = 0,
 ) -> dict[str, object]:
@@ -35,6 +36,7 @@ def _result(
         "normalization_error_count": normalization_errors,
         "extraction_errors": reasons,
         "extraction_error_play_types": play_types or {},
+        "extraction_error_action_types": action_types or {},
         "extraction_error_samples": {},
         "normalization_errors": {},
         "canonical_play_type_counts": {"PASS": row_count - error_count - normalization_errors},
@@ -86,6 +88,23 @@ def test_m6c_excluded_core_play_family_fails() -> None:
 
     assert status is M6CStatus.FAIL
     assert "excluded core/unreviewed play_type 'pass'" in reasons[0]
+
+
+def test_m6c_null_play_type_cannot_hide_rejected_core_action() -> None:
+    reason = "legacy structured penalty gap"
+    result = _result(
+        extraction_errors={reason: 1},
+        play_types={reason: {"<NULL>": 1}},
+        action_types={reason: {"RUSH": 1}},
+    )
+
+    status, reasons = classify_m6c_validation(result)
+
+    assert status is M6CStatus.FAIL
+    assert any(
+        "excluded core action_family 'RUSH'" in reason_text
+        for reason_text in reasons
+    )
 
 
 def test_m6c_normalization_or_state_error_fails() -> None:

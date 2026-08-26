@@ -17,6 +17,9 @@ class NflverseRowExtractionError(ValueError):
     """Raised when a real nflverse row cannot be converted without guessing."""
 
 
+UNKNOWN_PENALTY_TYPE = "UNKNOWN"
+
+
 def _value(row: Mapping[str, object], key: str) -> object | None:
     value = row.get(key)
     if isinstance(value, float) and math.isnan(value):
@@ -146,11 +149,11 @@ def _penalties(row: Mapping[str, object], *, no_play: bool) -> tuple[ProviderPen
     if not _flag(row, "penalty"):
         return ()
     team_code = _text(row, "penalty_team")
-    penalty_type = _text(row, "penalty_type")
-    if team_code is None or penalty_type is None:
+    if team_code is None:
         raise NflverseRowExtractionError(
-            "penalty flag is set but structured penalty team/type is missing"
+            "penalty flag is set but structured penalty team is missing"
         )
+    penalty_type = _text(row, "penalty_type") or UNKNOWN_PENALTY_TYPE
     return (
         ProviderPenaltyRecord(
             team_code=team_code,
@@ -196,7 +199,48 @@ def _participants(row: Mapping[str, object]) -> tuple[ProviderParticipantRecord,
     return tuple(participants)
 
 
-def extract_nflverse_play_record(row: Mapping[str, object]) -> NflversePlayRecord:
+def _is_proven_game_opening_kickoff(
+    row: Mapping[str, object],
+    *,
+    game_opening_row: bool,
+) -> bool:
+    """Return true only for an explicitly proven first-row opening kickoff."""
+
+    if not game_opening_row:
+        return False
+
+    if (_text(row, "play_type") or "").lower() != "kickoff":
+        return False
+    if not _flag(row, "kickoff_attempt"):
+        return False
+    if _integer(row, "qtr") != 1:
+        return False
+    if _integer(row, "quarter_seconds_remaining") != 900:
+        return False
+
+    if _value(row, "posteam_score") is not None:
+        return False
+    if _value(row, "defteam_score") is not None:
+        return False
+
+    home = _text(row, "home_team")
+    away = _text(row, "away_team")
+    offense = _text(row, "posteam")
+    defense = _text(row, "defteam")
+
+    if None in {home, away, offense, defense}:
+        return False
+    if offense == defense:
+        return False
+
+    return {offense, defense} == {home, away}
+
+
+def extract_nflverse_play_record(
+    row: Mapping[str, object],
+    *,
+    game_opening_row: bool = False,
+) -> NflversePlayRecord:
     """Convert one real nflverse PBP row into the small M6 semantic contract.
 
     Base PBP does not contain every charting concept. Unsupported fields remain
@@ -212,7 +256,15 @@ def extract_nflverse_play_record(row: Mapping[str, object]) -> NflversePlayRecor
     no_play = play_type == "no_play"
     pre_score = _score_pair(row, post=False)
     if pre_score is None:
-        raise NflverseRowExtractionError("pre-play home/away score cannot be reconstructed")
+        if _is_proven_game_opening_kickoff(
+            row,
+            game_opening_row=game_opening_row,
+        ):
+            pre_score = (0, 0)
+        else:
+            raise NflverseRowExtractionError(
+                "pre-play home/away score cannot be reconstructed"
+            )
     post_score = _score_pair(row, post=True)
     home_timeouts, away_timeouts = _timeouts(row)
 

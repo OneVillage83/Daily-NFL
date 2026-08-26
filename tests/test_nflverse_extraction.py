@@ -109,3 +109,74 @@ def test_negative_timeout_sentinel_becomes_unknown() -> None:
 def test_missing_preplay_score_fails_closed() -> None:
     with pytest.raises(NflverseRowExtractionError, match="pre-play home/away score"):
         extract_nflverse_play_record(_row(posteam_score=None))
+
+def test_proven_game_opening_kickoff_reconstructs_zero_zero() -> None:
+    record = extract_nflverse_play_record(
+        _row(
+            play_type="kickoff",
+            kickoff_attempt=1.0,
+            pass_attempt=0.0,
+            complete_pass=None,
+            first_down=0.0,
+            qtr=1.0,
+            quarter_seconds_remaining=900.0,
+            posteam_score=None,
+            defteam_score=None,
+            posteam_score_post=0.0,
+            defteam_score_post=6.0,
+            yards_gained=0.0,
+        ),
+        game_opening_row=True,
+    )
+
+    assert (record.home_score_before, record.away_score_before) == (0, 0)
+
+
+def test_game_opening_repair_requires_both_scores_missing() -> None:
+    with pytest.raises(NflverseRowExtractionError, match="pre-play home/away score"):
+        extract_nflverse_play_record(
+            _row(
+                play_type="kickoff",
+                kickoff_attempt=1.0,
+                pass_attempt=0.0,
+                complete_pass=None,
+                qtr=1.0,
+                quarter_seconds_remaining=900.0,
+                posteam_score=None,
+                defteam_score=0.0,
+            ),
+            game_opening_row=True,
+        )
+
+
+def test_missing_penalty_type_is_preserved_as_explicit_unknown() -> None:
+    record = extract_nflverse_play_record(
+        _row(
+            penalty=1.0,
+            penalty_team="NO",
+            penalty_type=None,
+            penalty_yards=5.0,
+            first_down_penalty=1.0,
+        )
+    )
+
+    penalty = record.penalties[0]
+    assert penalty.team_code == "NO"
+    assert penalty.penalty_type == "UNKNOWN"
+    assert penalty.yards == 5
+    assert penalty.automatic_first_down is True
+
+
+def test_missing_penalty_team_still_fails_closed() -> None:
+    with pytest.raises(
+        NflverseRowExtractionError,
+        match="structured penalty team is missing",
+    ):
+        extract_nflverse_play_record(
+            _row(
+                penalty=1.0,
+                penalty_team=None,
+                penalty_type=None,
+                penalty_yards=5.0,
+            )
+        )

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections import Counter, defaultdict
 from dataclasses import dataclass, replace
 
@@ -108,6 +109,74 @@ def _reject_sample(row: dict[str, object], raw_index: int) -> dict[str, object]:
     return sample
 
 
+def _raw_flag(row: dict[str, object], key: str) -> bool:
+    value = row.get(key)
+    if value is None:
+        return False
+    if isinstance(value, float) and math.isnan(value):
+        return False
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+
+    text = str(value).strip().lower()
+    return text in {"1", "true", "yes"}
+
+
+def _rejected_action_family(row: dict[str, object]) -> str:
+    """Classify rejected rows from structured provider facts when possible."""
+
+    hint = str(row.get("play_type") or "").strip().lower().replace("-", "_")
+
+    if hint == "no_play" and _raw_flag(row, "penalty"):
+        return "PENALTY_ONLY"
+    if _raw_flag(row, "qb_kneel") or hint in {"qb_kneel", "kneel"}:
+        return "KNEEL"
+    if _raw_flag(row, "qb_spike") or hint in {"qb_spike", "spike"}:
+        return "SPIKE"
+    if _raw_flag(row, "punt_attempt") or hint == "punt":
+        return "PUNT"
+    if _raw_flag(row, "field_goal_attempt") or hint in {
+        "field_goal",
+        "field_goal_attempt",
+    }:
+        return "FIELD_GOAL"
+    if _raw_flag(row, "kickoff_attempt") or hint == "kickoff":
+        return "KICKOFF"
+    if _raw_flag(row, "extra_point_attempt") or hint in {
+        "extra_point",
+        "extra_point_attempt",
+    }:
+        return "EXTRA_POINT"
+    if _raw_flag(row, "two_point_attempt") or hint in {
+        "two_point",
+        "two_point_attempt",
+    }:
+        return "TWO_POINT"
+    if _raw_flag(row, "sack") or hint == "sack":
+        return "SACK"
+    if _raw_flag(row, "qb_scramble") or hint in {"qb_scramble", "scramble"}:
+        return "SCRAMBLE"
+    if _raw_flag(row, "pass_attempt") or hint == "pass":
+        return "PASS"
+    if _raw_flag(row, "rush_attempt") or hint in {"run", "rush"}:
+        return "RUSH"
+    if _raw_flag(row, "timeout") or hint == "timeout":
+        return "TIMEOUT"
+    if _raw_flag(row, "quarter_end") or hint in {
+        "note",
+        "administrative",
+        "end_game",
+        "end_period",
+        "game_start",
+        "quarter_end",
+    }:
+        return "ADMINISTRATIVE"
+
+    return "<UNKNOWN>"
+
+
 def validate_nflverse_pbp_rows(
     rows: list[dict[str, object]],
     *,
@@ -128,6 +197,7 @@ def validate_nflverse_pbp_rows(
 
     extraction_errors: Counter[str] = Counter()
     extraction_error_play_types: dict[str, Counter[str]] = defaultdict(Counter)
+    extraction_error_action_types: dict[str, Counter[str]] = defaultdict(Counter)
     extraction_error_samples: dict[str, list[dict[str, object]]] = defaultdict(list)
     normalization_errors: Counter[str] = Counter()
     taxonomy: Counter[str] = Counter()
@@ -140,10 +210,23 @@ def validate_nflverse_pbp_rows(
     drive_maps: dict[str, dict[str, int]] = defaultdict(dict)
     representative: dict[str, dict[str, object]] = {}
 
+    first_raw_index_by_game: dict[str, int] = {}
+    for raw_index, raw_row in enumerate(rows):
+        game_id = str(raw_row.get("game_id") or "").strip()
+        if game_id:
+            first_raw_index_by_game.setdefault(game_id, raw_index)
+
     for raw_index, raw_row in enumerate(rows):
         row = dict(raw_row)
         try:
-            extracted = extract_nflverse_play_record(row)
+            raw_game_id = str(row.get("game_id") or "").strip()
+            extracted = extract_nflverse_play_record(
+                row,
+                game_opening_row=(
+                    bool(raw_game_id)
+                    and first_raw_index_by_game.get(raw_game_id) == raw_index
+                ),
+            )
             record = replace(extracted, source_row_index=raw_index)
             player_ids = player_ids_by_game[record.provider_game_id]
             _ensure_validation_player_ids(
@@ -163,6 +246,7 @@ def validate_nflverse_pbp_rows(
             extraction_errors[reason] += 1
             play_type = str(row.get("play_type") or "<NULL>")
             extraction_error_play_types[reason][play_type] += 1
+            extraction_error_action_types[reason][_rejected_action_family(row)] += 1
             if len(extraction_error_samples[reason]) < 5:
                 extraction_error_samples[reason].append(_reject_sample(row, raw_index))
             continue
@@ -263,6 +347,10 @@ def validate_nflverse_pbp_rows(
         "extraction_error_play_types": {
             reason: dict(counts.most_common())
             for reason, counts in extraction_error_play_types.items()
+        },
+        "extraction_error_action_types": {
+            reason: dict(counts.most_common())
+            for reason, counts in extraction_error_action_types.items()
         },
         "extraction_error_samples": dict(extraction_error_samples),
         "normalization_errors": dict(normalization_errors.most_common()),

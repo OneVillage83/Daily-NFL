@@ -9,7 +9,7 @@ from enum import StrEnum
 from typing import cast
 
 M6C_CONTRACT_VERSION = "M6C_HISTORICAL_CHECKPOINT_V1"
-M6C_VALIDATOR_VERSION = "M6C_PBP_VALIDATOR_V1"
+M6C_VALIDATOR_VERSION = "M6C_PBP_VALIDATOR_V2"
 
 KNOWN_EXTRACTION_REASONS = frozenset(
     {
@@ -19,6 +19,21 @@ KNOWN_EXTRACTION_REASONS = frozenset(
     }
 )
 ALLOWED_EXCLUDED_PLAY_TYPES = frozenset({"<NULL>", "no_play"})
+CORE_EXCLUDED_ACTION_FAMILIES = frozenset(
+    {
+        "PASS",
+        "RUSH",
+        "SCRAMBLE",
+        "SACK",
+        "KNEEL",
+        "SPIKE",
+        "PUNT",
+        "FIELD_GOAL",
+        "KICKOFF",
+        "EXTRA_POINT",
+        "TWO_POINT",
+    }
+)
 
 
 class M6CStatus(StrEnum):
@@ -84,6 +99,23 @@ def classify_m6c_validation(
             if count > 0 and play_type not in ALLOWED_EXCLUDED_PLAY_TYPES:
                 reasons.append(
                     f"excluded core/unreviewed play_type {play_type!r} under reason {reason!r}"
+                )
+
+    raw_action_types = result.get("extraction_error_action_types")
+    if not isinstance(raw_action_types, dict):
+        raise ValueError(
+            "validation result extraction_error_action_types must be a mapping"
+        )
+    action_types_by_reason = cast(dict[str, dict[str, int]], raw_action_types)
+    for reason, action_types in action_types_by_reason.items():
+        for action_type, count in action_types.items():
+            if (
+                count > 0
+                and action_type in CORE_EXCLUDED_ACTION_FAMILIES
+            ):
+                reasons.append(
+                    "excluded core action_family "
+                    f"{action_type!r} under reason {reason!r}"
                 )
 
     if reasons:
