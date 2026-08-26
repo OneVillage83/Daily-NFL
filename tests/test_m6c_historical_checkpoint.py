@@ -220,7 +220,7 @@ def test_m6c_manifest_separates_acquisition_and_execution_modes() -> None:
         "evidence_observation_id": "reo-2025",
         "raw_sha256": "a" * 64,
         "raw_size_bytes": 123,
-        "acquisition_mode": "REUSED_RAW",
+        "acquisition_mode": "ACQUIRED",
         "validation_fingerprint": "fingerprint-2025",
         "reproducibility_match": True,
     }
@@ -229,11 +229,13 @@ def test_m6c_manifest_separates_acquisition_and_execution_modes() -> None:
     entry = _season_manifest_entry(
         summary,
         execution_mode="RESUMED_VALIDATION",
+        raw_resolution_mode="REUSED_RAW",
     )
 
     assert summary == original
-    assert summary["acquisition_mode"] == "REUSED_RAW"
-    assert entry["acquisition_mode"] == "REUSED_RAW"
+    assert summary["acquisition_mode"] == "ACQUIRED"
+    assert entry["validation_acquisition_mode"] == "ACQUIRED"
+    assert entry["raw_resolution_mode"] == "REUSED_RAW"
     assert entry["execution_mode"] == "RESUMED_VALIDATION"
 
 
@@ -246,7 +248,7 @@ def test_m6c_manifest_rejects_unknown_execution_mode() -> None:
         "evidence_observation_id": "reo-2025",
         "raw_sha256": "a" * 64,
         "raw_size_bytes": 123,
-        "acquisition_mode": "REUSED_RAW",
+        "acquisition_mode": "ACQUIRED",
         "validation_fingerprint": "fingerprint-2025",
         "reproducibility_match": True,
     }
@@ -255,11 +257,38 @@ def test_m6c_manifest_rejects_unknown_execution_mode() -> None:
         _season_manifest_entry(
             summary,
             execution_mode="UNKNOWN_MODE",
+            raw_resolution_mode="REUSED_RAW",
         )
     except ValueError as exc:
         assert "unsupported M6C execution mode" in str(exc)
     else:
         raise AssertionError("unknown execution mode must fail closed")
+
+
+def test_m6c_manifest_rejects_unknown_raw_resolution_mode() -> None:
+    summary: dict[str, object] = {
+        "season": 2025,
+        "validation_status": M6CStatus.PASS.value,
+        "validation_reasons": [],
+        "evidence_id": "evidence-2025",
+        "evidence_observation_id": "reo-2025",
+        "raw_sha256": "a" * 64,
+        "raw_size_bytes": 123,
+        "acquisition_mode": "ACQUIRED",
+        "validation_fingerprint": "fingerprint-2025",
+        "reproducibility_match": True,
+    }
+
+    try:
+        _season_manifest_entry(
+            summary,
+            execution_mode="RESUMED_VALIDATION",
+            raw_resolution_mode="UNKNOWN_MODE",
+        )
+    except ValueError as exc:
+        assert "unsupported M6C raw resolution mode" in str(exc)
+    else:
+        raise AssertionError("unknown raw resolution mode must fail closed")
 
 
 def test_m6c_season_selection_supports_sentinel_full_and_ranges() -> None:

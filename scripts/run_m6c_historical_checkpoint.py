@@ -49,6 +49,7 @@ EXECUTION_MODES = frozenset(
         "RESUMED_VALIDATION",
     }
 )
+RAW_RESOLUTION_MODES = frozenset({"REUSED_RAW", "ACQUIRED"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -384,9 +385,14 @@ def _season_manifest_entry(
     summary: dict[str, object],
     *,
     execution_mode: str,
+    raw_resolution_mode: str,
 ) -> dict[str, object]:
     if execution_mode not in EXECUTION_MODES:
         raise ValueError(f"unsupported M6C execution mode: {execution_mode!r}")
+    if raw_resolution_mode not in RAW_RESOLUTION_MODES:
+        raise ValueError(
+            f"unsupported M6C raw resolution mode: {raw_resolution_mode!r}"
+        )
 
     return {
         "season": summary["season"],
@@ -396,7 +402,8 @@ def _season_manifest_entry(
         "evidence_observation_id": summary["evidence_observation_id"],
         "raw_sha256": summary["raw_sha256"],
         "raw_size_bytes": summary["raw_size_bytes"],
-        "acquisition_mode": summary["acquisition_mode"],
+        "validation_acquisition_mode": summary["acquisition_mode"],
+        "raw_resolution_mode": raw_resolution_mode,
         "execution_mode": execution_mode,
         "validation_fingerprint": summary["validation_fingerprint"],
         "reproducibility_match": summary["reproducibility_match"],
@@ -408,14 +415,20 @@ def _build_manifest(
     seasons: tuple[int, ...],
     summaries: list[dict[str, object]],
     execution_modes: list[str],
+    raw_resolution_modes: list[str],
     database: Path,
     raw_root: Path,
     output_root: Path,
     schema_version: int,
 ) -> dict[str, object]:
-    if len(summaries) != len(execution_modes):
+    if not (
+        len(summaries)
+        == len(execution_modes)
+        == len(raw_resolution_modes)
+    ):
         raise ValueError(
-            "M6C summaries and execution modes must have identical lengths"
+            "M6C summaries, execution modes, and raw resolution modes "
+            "must have identical lengths"
         )
 
     statuses = [str(summary["validation_status"]) for summary in summaries]
@@ -461,10 +474,12 @@ def _build_manifest(
             _season_manifest_entry(
                 summary,
                 execution_mode=execution_mode,
+                raw_resolution_mode=raw_resolution_mode,
             )
-            for summary, execution_mode in zip(
+            for summary, execution_mode, raw_resolution_mode in zip(
                 summaries,
                 execution_modes,
+                raw_resolution_modes,
                 strict=True,
             )
         ],
@@ -489,6 +504,7 @@ def main() -> int:
     service = AcquisitionService(FileSystemRawEvidenceStore(raw_root))
     summaries: list[dict[str, object]] = []
     execution_modes: list[str] = []
+    raw_resolution_modes: list[str] = []
 
     with open_database(database) as connection:
         schema_version = apply_migrations(connection)
@@ -518,11 +534,13 @@ def main() -> int:
 
             summaries.append(summary)
             execution_modes.append(execution_mode)
+            raw_resolution_modes.append(raw.acquisition_mode)
 
             concise = {
                 "season": season,
                 "status": summary["validation_status"],
-                "acquisition_mode": summary["acquisition_mode"],
+                "validation_acquisition_mode": summary["acquisition_mode"],
+                "raw_resolution_mode": raw.acquisition_mode,
                 "execution_mode": execution_mode,
                 "validation_fingerprint": summary["validation_fingerprint"],
             }
@@ -532,6 +550,7 @@ def main() -> int:
         seasons=seasons,
         summaries=summaries,
         execution_modes=execution_modes,
+        raw_resolution_modes=raw_resolution_modes,
         database=database,
         raw_root=raw_root,
         output_root=output_root,
