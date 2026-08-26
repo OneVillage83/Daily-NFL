@@ -561,7 +561,7 @@ Documentation/status commits after `5f1e2efe115c8f889d99eb7f6169050ee90c8ca7` do
 
 M6C proves full historical compatibility of the certified M3-M6 stack across nflverse PBP seasons 1999-2025 without fabricating production historical PlayerIds.
 
-`	ext
+```text
 Gate 0: PASS
 Gate A: PASS
 Gate B: PASS — 27 / 27 seasons
@@ -576,7 +576,7 @@ full pytest: 189 passed
 Ruff: PASS
 strict mypy: PASS — 95 source files
 SQLite: 0 -> 7 / 7 -> 7
-`
+```
 
 Evidence:
 - docs/implementation/M6C_ARCHITECTURE_CONFORMANCE_AUDIT.md
@@ -589,18 +589,18 @@ M6C does not certify F-6 through F-9. TeamState, PlayerState, UnitState, Coachin
 
 Final state:
 
-`	ext
+```text
 M6C — ARCHITECTURE-CERTIFIED
-`
+```
 
 ---
 
 ## Next Checkpoint
 
-`	ext
+```text
 M7 — State Engine V1
 Architecture: F-6 through F-9
 Dependencies: certified M0-M6 plus M6C historical compatibility
-`
+```
 
 M7 may begin only after PR #9 is squash-merged to main.
