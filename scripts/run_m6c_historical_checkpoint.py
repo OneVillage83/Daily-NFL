@@ -42,6 +42,13 @@ from daily_nfl.validation import (  # noqa: E402
 SENTINEL_SEASONS = (1999, 2005, 2010, 2015, 2020, 2025)
 MIN_SEASON = 1999
 MAX_COMPLETED_SEASON = 2025
+EXECUTION_MODES = frozenset(
+    {
+        "VALIDATED",
+        "REVALIDATED",
+        "RESUMED_VALIDATION",
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -373,15 +380,44 @@ def _status_rank(value: str) -> int:
     }[value]
 
 
+def _season_manifest_entry(
+    summary: dict[str, object],
+    *,
+    execution_mode: str,
+) -> dict[str, object]:
+    if execution_mode not in EXECUTION_MODES:
+        raise ValueError(f"unsupported M6C execution mode: {execution_mode!r}")
+
+    return {
+        "season": summary["season"],
+        "status": summary["validation_status"],
+        "reasons": summary["validation_reasons"],
+        "evidence_id": summary["evidence_id"],
+        "evidence_observation_id": summary["evidence_observation_id"],
+        "raw_sha256": summary["raw_sha256"],
+        "raw_size_bytes": summary["raw_size_bytes"],
+        "acquisition_mode": summary["acquisition_mode"],
+        "execution_mode": execution_mode,
+        "validation_fingerprint": summary["validation_fingerprint"],
+        "reproducibility_match": summary["reproducibility_match"],
+    }
+
+
 def _build_manifest(
     *,
     seasons: tuple[int, ...],
     summaries: list[dict[str, object]],
+    execution_modes: list[str],
     database: Path,
     raw_root: Path,
     output_root: Path,
     schema_version: int,
 ) -> dict[str, object]:
+    if len(summaries) != len(execution_modes):
+        raise ValueError(
+            "M6C summaries and execution modes must have identical lengths"
+        )
+
     statuses = [str(summary["validation_status"]) for summary in summaries]
     overall_status = max(statuses, key=_status_rank)
     validations = [cast(dict[str, object], summary["validation"]) for summary in summaries]
@@ -422,19 +458,15 @@ def _build_manifest(
         "output_root": str(output_root),
         "totals": totals,
         "seasons": [
-            {
-                "season": summary["season"],
-                "status": summary["validation_status"],
-                "reasons": summary["validation_reasons"],
-                "evidence_id": summary["evidence_id"],
-                "evidence_observation_id": summary["evidence_observation_id"],
-                "raw_sha256": summary["raw_sha256"],
-                "raw_size_bytes": summary["raw_size_bytes"],
-                "acquisition_mode": summary["acquisition_mode"],
-                "validation_fingerprint": summary["validation_fingerprint"],
-                "reproducibility_match": summary["reproducibility_match"],
-            }
-            for summary in summaries
+            _season_manifest_entry(
+                summary,
+                execution_mode=execution_mode,
+            )
+            for summary, execution_mode in zip(
+                summaries,
+                execution_modes,
+                strict=True,
+            )
         ],
     }
     manifest["manifest_sha256"] = document_sha256(manifest)
@@ -456,6 +488,7 @@ def main() -> int:
     )
     service = AcquisitionService(FileSystemRawEvidenceStore(raw_root))
     summaries: list[dict[str, object]] = []
+    execution_modes: list[str] = []
 
     with open_database(database) as connection:
         schema_version = apply_migrations(connection)
@@ -473,15 +506,24 @@ def main() -> int:
             previous = _valid_resumable_summary(path, season=season, raw=raw)
             if previous is not None and not args.revalidate:
                 summary = previous
-                summary["acquisition_mode"] = "RESUMED_VALIDATION"
+                execution_mode = "RESUMED_VALIDATION"
             else:
                 summary = _validate_raw_season(raw=raw, previous_summary=previous)
+                execution_mode = (
+                    "REVALIDATED"
+                    if previous is not None
+                    else "VALIDATED"
+                )
                 _atomic_write_json(path, summary)
+
             summaries.append(summary)
+            execution_modes.append(execution_mode)
+
             concise = {
                 "season": season,
                 "status": summary["validation_status"],
                 "acquisition_mode": summary["acquisition_mode"],
+                "execution_mode": execution_mode,
                 "validation_fingerprint": summary["validation_fingerprint"],
             }
             print(json.dumps(concise, sort_keys=True))
@@ -489,6 +531,7 @@ def main() -> int:
     manifest = _build_manifest(
         seasons=seasons,
         summaries=summaries,
+        execution_modes=execution_modes,
         database=database,
         raw_root=raw_root,
         output_root=output_root,

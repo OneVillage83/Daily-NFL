@@ -14,6 +14,7 @@ from daily_nfl.validation.nflverse_pbp import _rejected_action_family
 from scripts.run_m6c_historical_checkpoint import (
     RawSeasonEvidence,
     _resolve_seasons,
+    _season_manifest_entry,
     _valid_resumable_summary,
 )
 
@@ -208,6 +209,57 @@ def test_m6c_resume_requires_integrity_raw_identity_and_pass(tmp_path: Path) -> 
     corrupted["validation_status"] = M6CStatus.FAIL.value
     path.write_text(json.dumps(corrupted), encoding="utf-8")
     assert _valid_resumable_summary(path, season=1999, raw=raw) is None
+
+
+def test_m6c_manifest_separates_acquisition_and_execution_modes() -> None:
+    summary: dict[str, object] = {
+        "season": 2025,
+        "validation_status": M6CStatus.PASS.value,
+        "validation_reasons": [],
+        "evidence_id": "evidence-2025",
+        "evidence_observation_id": "reo-2025",
+        "raw_sha256": "a" * 64,
+        "raw_size_bytes": 123,
+        "acquisition_mode": "REUSED_RAW",
+        "validation_fingerprint": "fingerprint-2025",
+        "reproducibility_match": True,
+    }
+    original = dict(summary)
+
+    entry = _season_manifest_entry(
+        summary,
+        execution_mode="RESUMED_VALIDATION",
+    )
+
+    assert summary == original
+    assert summary["acquisition_mode"] == "REUSED_RAW"
+    assert entry["acquisition_mode"] == "REUSED_RAW"
+    assert entry["execution_mode"] == "RESUMED_VALIDATION"
+
+
+def test_m6c_manifest_rejects_unknown_execution_mode() -> None:
+    summary: dict[str, object] = {
+        "season": 2025,
+        "validation_status": M6CStatus.PASS.value,
+        "validation_reasons": [],
+        "evidence_id": "evidence-2025",
+        "evidence_observation_id": "reo-2025",
+        "raw_sha256": "a" * 64,
+        "raw_size_bytes": 123,
+        "acquisition_mode": "REUSED_RAW",
+        "validation_fingerprint": "fingerprint-2025",
+        "reproducibility_match": True,
+    }
+
+    try:
+        _season_manifest_entry(
+            summary,
+            execution_mode="UNKNOWN_MODE",
+        )
+    except ValueError as exc:
+        assert "unsupported M6C execution mode" in str(exc)
+    else:
+        raise AssertionError("unknown execution mode must fail closed")
 
 
 def test_m6c_season_selection_supports_sentinel_full_and_ranges() -> None:
