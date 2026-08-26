@@ -1,13 +1,13 @@
 # M6C Gate B — Full Historical Compatibility Result
 
-**Project:** The Daily Line — Daily NFL  
-**Checkpoint:** M6C — Controlled Historical Continuation / Full Historical Compatibility  
-**Gate:** B — Full completed-history sweep  
-**Status:** CLOSED / PASS  
-**Historical range:** 1999–2025 inclusive (27 completed seasons)  
-**Contract:** `M6C_HISTORICAL_CHECKPOINT_V1`  
-**Validator:** `M6C_PBP_VALIDATOR_V3`  
-**Validator-semantics authority:** `d4c3e14c2a3cd9c40dd33a9a2acc9c75d7b4dfd0`  
+**Project:** The Daily Line — Daily NFL
+**Checkpoint:** M6C — Controlled Historical Continuation / Full Historical Compatibility
+**Gate:** B — Full completed-history sweep
+**Status:** CLOSED / PASS
+**Historical range:** 1999–2025 inclusive (27 completed seasons)
+**Contract:** `M6C_HISTORICAL_CHECKPOINT_V1`
+**Validator:** `M6C_PBP_VALIDATOR_V3`
+**Validator-semantics authority:** `d4c3e14c2a3cd9c40dd33a9a2acc9c75d7b4dfd0`
 **Runner/provenance authority:** `98aba116a80c51c6dc9f05d602f5bc41e68188e6`
 
 ## Command

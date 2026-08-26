@@ -1,9 +1,9 @@
 # M6C Gate A V2 — Revalidation Result
 
-**Project:** The Daily Line — Daily NFL  
-**Checkpoint:** M6C — Controlled Historical Continuation / Full Historical Compatibility  
-**Status:** GATE A OPEN — 2010 ONLY BLOCKED  
-**Executable authority:** `695f30f175cf70468c38b79e4150592b6ed692a9`  
+**Project:** The Daily Line — Daily NFL
+**Checkpoint:** M6C — Controlled Historical Continuation / Full Historical Compatibility
+**Status:** GATE A OPEN — 2010 ONLY BLOCKED
+**Executable authority:** `695f30f175cf70468c38b79e4150592b6ed692a9`
 **Validator:** `M6C_PBP_VALIDATOR_V2`
 
 This document records the exact-head remediation validation and the first Gate-A rerun after the 1999/2010 historical extraction hardening.

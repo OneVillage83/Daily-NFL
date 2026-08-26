@@ -1,8 +1,8 @@
 # M6C Gate A Triage — 1999 and 2010
 
-**Project:** The Daily Line — Daily NFL  
-**Checkpoint:** M6C — Controlled Historical Continuation / Full Historical Compatibility  
-**Status:** TRIAGE OPEN  
+**Project:** The Daily Line — Daily NFL
+**Checkpoint:** M6C — Controlled Historical Continuation / Full Historical Compatibility
+**Status:** TRIAGE OPEN
 **Source Gate-A executable authority:** `4a17bb0722efe37603c2856447ba02fd1005f690`
 
 This document preserves the exact failure shape for the two Gate-A sentinel seasons that did not pass. It exists separately from final certification evidence so later work can reconstruct why remediation was required without relying on chat history.
