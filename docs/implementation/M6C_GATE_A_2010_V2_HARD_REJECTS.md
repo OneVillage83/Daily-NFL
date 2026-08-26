@@ -2,8 +2,8 @@
 
 **Project:** The Daily Line — Daily NFL  
 **Checkpoint:** M6C — Controlled Historical Continuation / Full Historical Compatibility  
-**Status:** TRIAGE OPEN — FIVE REVIEW-PLACEHOLDER ROWS REMAIN  
-**Executable authority:** `695f30f175cf70468c38b79e4150592b6ed692a9`  
+**Status:** TRIAGE CLOSED — REMEDIATION APPROVED  
+**Executable authority under diagnosis:** `695f30f175cf70468c38b79e4150592b6ed692a9`  
 **Validator:** `M6C_PBP_VALIDATOR_V2`
 
 ## 1. 2010 V2 summary
@@ -53,20 +53,94 @@ Affected games:
 
 These rows are classified as `KICKOFF` by the V2 rejected-action detector solely because `kickoff_attempt=1`, despite lacking the state fields required for an actual kickoff execution and carrying only the review-placeholder description.
 
-## 3. Current interpretation
+## 3. Adjacency evidence
 
-The five rows are strong candidates for provider review/administrative placeholder metadata rather than true kickoff executions. However, this interpretation is not yet approved.
+The follow-up raw-row diagnostic examined the first eight provider rows of every affected game.
 
-Before changing the classifier or opening-kickoff logic, inspect the immediately adjacent raw rows in all five games to determine:
+In all five games:
 
-1. whether the placeholder is the first raw row for the game;
-2. whether the following row is the actual opening kickoff;
-3. whether that following row carries the real Q1 15:00 clock/state/description;
-4. whether the placeholder duplicates or merely annotates the opening kickoff;
-5. whether an opening-kickoff repair must use the first state-bearing row rather than literally the first provider row.
+1. the malformed review-placeholder is provider row 1 for the game;
+2. it has `play_id=1`, `play_type=NULL`, missing clock/yardline/pre-scores, and description `*** play under review ***`;
+3. the immediately following provider row is a real opening kickoff;
+4. that real kickoff has `play_type=kickoff`, `kickoff_attempt=1`, Q1 at 15:00 (`quarter_seconds_remaining=900`), a real yardline, explicit 0-0 pre-score state, and a normal football play description;
+5. subsequent rows continue normal game state from the real kickoff.
 
-## 4. Prohibited shortcut
+Examples:
 
-Do not simply remove `KICKOFF` from core hard-reject accounting or allowlist these five rows. If adjacency proves they are provider metadata, classify only the exact evidence-backed placeholder shape administratively and preserve the actual opening kickoff as the canonical state-bearing row.
+```text
+2010_01_DEN_JAX
+row 1: play_id=1, review placeholder, no clock/yardline/scores
+row 2: play_id=39, J.Scobee opening kickoff, Q1 15:00, yardline_100=30, scores 0-0
 
-Gate A remains **OPEN / BLOCKED on 2010 only**. Gate B remains locked.
+2010_03_IND_DEN
+row 1: play_id=1, review placeholder, no clock/yardline/scores
+row 2: play_id=45, M.Prater opening kickoff, Q1 15:00, yardline_100=30, scores 0-0
+
+2010_07_NE_SD
+row 1: play_id=1, review placeholder, no clock/yardline/scores
+row 2: play_id=36, S.Gostkowski opening kickoff, Q1 15:00, yardline_100=30, scores 0-0
+
+2010_07_PIT_MIA
+row 1: play_id=1, review placeholder, no clock/yardline/scores
+row 2: play_id=37, D.Carpenter opening kickoff, Q1 15:00, yardline_100=30, scores 0-0
+
+2010_08_HOU_IND
+row 1: play_id=1, review placeholder, no clock/yardline/scores
+row 2: play_id=36, J.Kapinos opening kickoff, Q1 15:00, yardline_100=30, scores 0-0
+```
+
+The placeholder therefore does not carry a distinct football execution or state transition. The inherited `kickoff_attempt=1` flag is not sufficient to treat it as a real kickoff when the exact review-placeholder signature is present.
+
+## 4. Approved remediation
+
+The safest fix is validation-classification-only.
+
+Do **not** change the certified nflverse extractor again. Do **not** broaden opening-kickoff reconstruction. Do **not** weaken the global KICKOFF hard-reject policy.
+
+Instead, the M6C rejected-row action classifier may recognize the exact provider review-placeholder signature before inherited execution flags:
+
+```text
+desc == "*** play under review ***"
+play_id == 1
+play_type is absent
+qtr == 1
+quarter_seconds_remaining is absent
+yardline_100 is absent
+posteam_score is absent
+defteam_score is absent
+```
+
+Rows meeting that full signature are classified as `ADMINISTRATIVE` for rejected-row coverage accounting. The actual following kickoff remains the canonical state-bearing row and continues to be validated normally.
+
+This is not a generic review-row allowlist. A review row with real clock/yardline/score state, non-initial play identity, or a populated provider play type does not receive this classification automatically.
+
+## 5. Versioning and validation requirement
+
+Because rejected-row classification semantics change, bump the validator from:
+
+```text
+M6C_PBP_VALIDATOR_V2
+```
+
+to:
+
+```text
+M6C_PBP_VALIDATOR_V3
+```
+
+This prevents old V2 summaries from resuming as equivalent evidence.
+
+Required before Gate A may close:
+
+- focused classifier regression proving the exact placeholder becomes `ADMINISTRATIVE`;
+- near-miss regression proving a real kickoff or incomplete placeholder remains `KICKOFF`/hard-rejected;
+- Ruff PASS;
+- strict mypy PASS;
+- full pytest PASS;
+- clean exact committed executable SHA;
+- all six Gate-A sentinels revalidated from stored raw under V3;
+- 1999/2005/2010/2015/2020/2025 all PASS;
+- normalization errors remain zero;
+- adjacent next-state errors remain zero.
+
+Gate A remains **OPEN / BLOCKED pending V3 implementation and revalidation**. Gate B remains locked.
