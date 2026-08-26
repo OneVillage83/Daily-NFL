@@ -1,10 +1,10 @@
 # M6C — Controlled Historical Continuation Progress Log
 
-**Project:** The Daily Line — Daily NFL  
-**Checkpoint:** M6C — Controlled Historical Continuation / Full Historical Compatibility  
-**Status:** IN PROGRESS  
-**Branch:** `checkpoint/m6c-historical-continuation`  
-**Draft PR:** #9  
+**Project:** The Daily Line — Daily NFL
+**Checkpoint:** M6C — Controlled Historical Continuation / Full Historical Compatibility
+**Status:** IN PROGRESS
+**Branch:** `checkpoint/m6c-historical-continuation`
+**Draft PR:** #9
 **Certified M6 base:** `7815873d97b3233e0d67f7e16b8315b8c02d44ef`
 
 This is the running resume/handoff log for M6C. Update it as evidence, decisions, defects, fixes, and validation gates occur. It is intentionally separate from the final certification evidence so an interrupted checkpoint can be resumed without reconstructing chat history.

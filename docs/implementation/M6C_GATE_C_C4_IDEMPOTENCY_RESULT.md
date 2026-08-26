@@ -1,10 +1,10 @@
 # M6C Gate C — C-4 Forced Reacquisition / Idempotency Result
 
-**Project:** The Daily Line — Daily NFL  
-**Checkpoint:** M6C — Controlled Historical Continuation / Full Historical Compatibility  
-**Status:** PASS  
-**Runner/provenance authority:** `98aba116a80c51c6dc9f05d602f5bc41e68188e6`  
-**Validator:** `M6C_PBP_VALIDATOR_V3`  
+**Project:** The Daily Line — Daily NFL
+**Checkpoint:** M6C — Controlled Historical Continuation / Full Historical Compatibility
+**Status:** PASS
+**Runner/provenance authority:** `98aba116a80c51c6dc9f05d602f5bc41e68188e6`
+**Validator:** `M6C_PBP_VALIDATOR_V3`
 **Validator semantics authority:** `d4c3e14c2a3cd9c40dd33a9a2acc9c75d7b4dfd0`
 
 ## Exact-head quality gate

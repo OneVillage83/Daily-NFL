@@ -1,9 +1,9 @@
 # M6C Gate C — C-3 Negative Resume Rejection
 
-**Project:** The Daily Line — Daily NFL  
-**Checkpoint:** M6C — Controlled Historical Continuation / Full Historical Compatibility  
-**Status:** C-3 CLOSED / PASS  
-**Runner/provenance authority:** `19df3e5e8fc648a2071d94f1f2c310fb7033fac2`  
+**Project:** The Daily Line — Daily NFL
+**Checkpoint:** M6C — Controlled Historical Continuation / Full Historical Compatibility
+**Status:** C-3 CLOSED / PASS
+**Runner/provenance authority:** `19df3e5e8fc648a2071d94f1f2c310fb7033fac2`
 **Validator:** `M6C_PBP_VALIDATOR_V3`
 
 ## Purpose
