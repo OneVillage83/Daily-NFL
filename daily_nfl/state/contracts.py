@@ -5,13 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
-from typing import Generic, TypeVar
 
 from daily_nfl.domain import GameId, StateSnapshotId, TeamSeasonId
 from daily_nfl.pit import PITInputRef, PITValidationResult
 from daily_nfl.state.uncertainty import StateUncertainty
-
-PayloadT = TypeVar("PayloadT")
 
 
 class StateType(StrEnum):
@@ -80,7 +77,7 @@ class StateCoverage:
 
 
 @dataclass(frozen=True, slots=True)
-class StateSnapshotEnvelope(Generic[PayloadT]):
+class StateSnapshotEnvelope[PayloadT]:
     """Immutable semantic envelope shared by every persisted M7 state family.
 
     M7-B owns deterministic manifest construction, hashing, sealing, and SQLite
