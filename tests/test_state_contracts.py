@@ -23,6 +23,7 @@ from daily_nfl.state import (
 
 AS_OF = datetime(2026, 9, 13, 16, 0, tzinfo=UTC)
 CREATED_AT = datetime(2026, 9, 13, 16, 1, tzinfo=UTC)
+DEFAULT_SNAPSHOT_ID = StateSnapshotId("state-1")
 
 
 def _input_ref(
@@ -50,7 +51,7 @@ def _coverage() -> StateCoverage:
 
 def _envelope(
     *,
-    snapshot_id: StateSnapshotId = StateSnapshotId("state-1"),
+    snapshot_id: StateSnapshotId = DEFAULT_SNAPSHOT_ID,
     as_of: datetime = AS_OF,
     inputs: tuple[PITInputRef, ...] = (),
     dependencies: tuple[StateSnapshotId, ...] = (),
