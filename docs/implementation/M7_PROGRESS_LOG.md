@@ -5,7 +5,7 @@
 **Branch:** `checkpoint/m7-state-engine-v1`
 **Certified base:** `0dd515ec36f370ce70f67b3e771e1ceb4e36a149`
 **Architecture:** F-6, F-7, F-8, F-9, F-10
-**Status:** IN PROGRESS — PRE-IMPLEMENTATION ARCHITECTURE LOCKED
+**Status:** IN PROGRESS — GATE 0 CLOSED / M7-A STARTING
 
 This file is the authoritative resume point while M7 is open. Final certification status remains governed by `ARCHITECTURE_CERTIFICATION_LOG.md`.
 
@@ -16,6 +16,7 @@ This file is the authoritative resume point while M7 is open. Final certificatio
 - `docs/implementation/IMPLEMENTATION_ROADMAP_V1.md`
 - `docs/implementation/M7_STATE_ENGINE_V1_CONTRACT.md`
 - `docs/implementation/M7_PREIMPLEMENTATION_CONFORMANCE_AUDIT.md`
+- `docs/implementation/M7_GATE0_BASELINE_20260827.md`
 
 ## 2. Locked scope
 
@@ -53,7 +54,7 @@ Reusable foundations:
 
 ## 4. Pre-implementation audit result
 
-The repo contains **no existing M7 state-engine implementation**.
+The repo contains **no pre-existing M7 state-engine implementation**.
 
 Partial precursors:
 
@@ -92,13 +93,44 @@ M7-I  PIT multi-snapshot validation
 M7-J  Historical/real-data validation + certification
 ```
 
-## 6. Gate state
+## 6. Gate 0 evidence
+
+Exact tested documentation head:
+
+```text
+fa22e63db79f49d9072f318df18cc38d20d30434
+```
+
+Local environment and quality baseline:
+
+```text
+Python 3.12.10
+E:\Daily-NFL\.venv\Scripts\python.exe
+Ruff: PASS
+strict mypy: PASS — 95 source files
+full pytest: PASS — 189 tests
+git diff --check: PASS
+working tree: clean
+```
+
+SQLite baseline:
+
+```text
+fresh database: schema 0 -> 7
+check: schema 7 -> 7
+foreign_keys_enabled: true
+integrity_ok: true
+```
+
+Gate 0 is formally **CLOSED / PASS**. M7 executable work is authorized.
+
+## 7. Gate state
 
 ```text
 M7 contract                       LOCKED
 Pre-implementation audit          COMPLETE
-Gate 0 local/static baseline      PENDING USER-LOCAL RUN
-M7-A common contracts             NOT STARTED
+Gate 0 local/static baseline      CLOSED / PASS
+M7-A common contracts             IN PROGRESS
 M7-B migration/persistence        NOT STARTED
 M7-C injury/availability          NOT STARTED
 M7-D player state                 NOT STARTED
@@ -111,22 +143,23 @@ M7-J final historical validation  NOT STARTED
 M7 certification                  WITHHELD
 ```
 
-## 7. Immediate next action
+## 8. Immediate next action
 
-Before the first executable M7 commit, establish the exact local baseline on certified M6C `main` / M7 branch:
+Implement **M7-A Common State Contracts / IDs / Uncertainty**.
 
-```text
-Python 3.12.10 project venv
-full pytest
-Ruff
-strict mypy
-fresh/current SQLite schema check
-clean exact branch SHA
-```
+M7-A must establish the reusable provider-neutral primitives required by every later M7 family:
 
-After Gate 0 is recorded, implementation begins with **M7-A Common State Contracts / IDs / Uncertainty**, followed immediately by migration v8 and the shared snapshot ledger.
+- canonical state identifiers;
+- state type / subject type vocabulary;
+- immutable snapshot-envelope metadata contract;
+- structured coverage/missingness;
+- probability / moments / interval / categorical-mixture uncertainty types;
+- strict finite/range/normalization validation;
+- deterministic serialization inputs suitable for later M7-B hashing and persistence.
 
-## 8. Update rule
+No migration or family-specific state estimator should be added until these shared contracts are validated locally.
+
+## 9. Update rule
 
 Update this file whenever:
 
