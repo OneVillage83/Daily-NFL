@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Protocol
 
 
 def _require_finite(value: float, label: str) -> None:
@@ -145,8 +146,13 @@ class NamedCategoricalDistribution:
         _require_name(self.name)
 
 
-def _require_unique_names(values: tuple[object, ...], label: str) -> None:
-    names = [str(getattr(value, "name")) for value in values]
+class _Named(Protocol):
+    @property
+    def name(self) -> str: ...
+
+
+def _require_unique_names(values: tuple[_Named, ...], label: str) -> None:
+    names = [value.name for value in values]
     if len(names) != len(set(names)):
         raise ValueError(f"{label} names must be unique")
 
