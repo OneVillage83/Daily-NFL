@@ -26,6 +26,7 @@ CREATE TABLE player_state_evidence_observations (
     ),
     metrics_json TEXT NOT NULL,
     metrics_sha256 TEXT NOT NULL,
+    payload_sha256 TEXT NOT NULL,
     sample_weight REAL NOT NULL CHECK (sample_weight > 0.0),
     source_confidence REAL NOT NULL CHECK (
         source_confidence >= 0.0 AND source_confidence <= 1.0
@@ -54,7 +55,8 @@ CREATE TABLE player_state_evidence_observations (
     CHECK (trim(logical_key) <> ''),
     CHECK (trim(evidence_contract) <> ''),
     CHECK (trim(evidence_version) <> ''),
-    CHECK (length(metrics_sha256) = 64)
+    CHECK (length(metrics_sha256) = 64),
+    CHECK (length(payload_sha256) = 64)
 );
 
 CREATE INDEX idx_player_state_evidence_player_available
