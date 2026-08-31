@@ -11,10 +11,11 @@ from daily_nfl.persistence.m5_pit_conformance_schema import M5_PIT_CONFORMANCE_S
 from daily_nfl.persistence.m7_injury_schema import M7_INJURY_SCHEMA_SQL
 from daily_nfl.persistence.m7_player_schema import M7_PLAYER_SCHEMA_SQL
 from daily_nfl.persistence.m7_state_schema import M7_STATE_SCHEMA_SQL
+from daily_nfl.persistence.m7_unit_schema import M7_UNIT_SCHEMA_SQL
 from daily_nfl.persistence.pit_schema import PIT_SNAPSHOT_SCHEMA_SQL
 from daily_nfl.persistence.schema import INITIAL_SCHEMA_SQL
 
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 11
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,6 +71,11 @@ MIGRATIONS: tuple[Migration, ...] = (
         version=10,
         name="m7_player_state_evidence_foundation",
         sql=M7_PLAYER_SCHEMA_SQL,
+    ),
+    Migration(
+        version=11,
+        name="m7_unit_state_evidence_foundation",
+        sql=M7_UNIT_SCHEMA_SQL,
     ),
 )
 
