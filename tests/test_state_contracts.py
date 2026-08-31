@@ -20,7 +20,6 @@ from daily_nfl.state import (
     StateUncertainty,
 )
 
-
 AS_OF = datetime(2026, 9, 13, 16, 0, tzinfo=UTC)
 CREATED_AT = datetime(2026, 9, 13, 16, 1, tzinfo=UTC)
 DEFAULT_SNAPSHOT_ID = StateSnapshotId("state-1")

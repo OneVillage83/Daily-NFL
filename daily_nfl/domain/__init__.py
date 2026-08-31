@@ -33,9 +33,9 @@ from daily_nfl.domain.identity import (
     TeamSeason,
 )
 from daily_nfl.domain.ids import (
-    CoachRoleId,
     CoachingRegimeId,
     CoachingStateId,
+    CoachRoleId,
     CompetitionId,
     DepthChartSnapshotId,
     DriveId,
