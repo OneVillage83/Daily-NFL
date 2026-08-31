@@ -280,7 +280,7 @@ def test_existing_storage_conflict_fails_closed() -> None:
         connection.close()
 
 
-def test_cycle_attempt_is_rejected_by_sealed_membership_boundary() -> None:
+def test_dependency_cycle_attempt_is_rejected_explicitly() -> None:
     connection = _migrated_connection()
     try:
         first = _snapshot(quality=0.4, as_of=AS_OF - timedelta(hours=2))
@@ -292,7 +292,7 @@ def test_cycle_attempt_is_rejected_by_sealed_membership_boundary() -> None:
         )
         record_state_snapshot(connection, second)
 
-        with pytest.raises(sqlite3.IntegrityError, match="after sealing"):
+        with pytest.raises(sqlite3.IntegrityError, match="dependency cycle is forbidden"):
             connection.execute(
                 """
                 INSERT INTO state_snapshot_dependencies(snapshot_id, parent_snapshot_id)
