@@ -48,7 +48,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(
         version=6,
         name="m4_identity_reconciliation_conformance",
-        sql=M4_IDENTITY_RECONCILIATION_SCHEMA_SQL,
+        sql=M4_IDENTITY_CONFORMANCE_SCHEMA_SQL,
     ),
     Migration(
         version=7,
@@ -180,7 +180,8 @@ def apply_migrations(connection: sqlite3.Connection) -> int:
             continue
         if migration.version != expected_next:
             raise SchemaVersionError(
-                f"migration sequence gap: expected version {expected_next}, found {migration.version}"
+                "migration sequence gap: "
+                f"expected version {expected_next}, found {migration.version}"
             )
 
         escaped_name = migration.name.replace("'", "''")
