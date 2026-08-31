@@ -27,6 +27,26 @@ from daily_nfl.state.injury_repository import (
     record_injury_episode_revision,
     record_injury_observation,
 )
+from daily_nfl.state.player import (
+    CANONICAL_POSITION_METRICS,
+    DEFAULT_PLAYER_STATE_ESTIMATOR_CONFIG,
+    PlayerEvidenceKind,
+    PlayerPosition,
+    PlayerStateDimension,
+    PlayerStateEstimatorConfig,
+    PlayerStateEvidenceObservation,
+    PlayerStatePayload,
+    build_player_state_snapshot,
+    canonical_position_metrics,
+    player_evidence_metrics_sha256,
+    resolve_player_position,
+)
+from daily_nfl.state.player_repository import (
+    PlayerStateEvidenceConflictError,
+    build_player_state_as_of,
+    player_state_evidence_as_of,
+    record_player_state_evidence,
+)
 from daily_nfl.state.repository import (
     StateSnapshotConflictError,
     record_state_snapshot,
@@ -55,7 +75,9 @@ from daily_nfl.state.uncertainty import (
 )
 
 __all__ = [
+    "CANONICAL_POSITION_METRICS",
     "DEFAULT_INJURY_ESTIMATOR_CONFIG",
+    "DEFAULT_PLAYER_STATE_ESTIMATOR_CONFIG",
     "ActiveStatus",
     "BoundedInterval",
     "CategoricalDistribution",
@@ -74,6 +96,13 @@ __all__ = [
     "NamedMoments",
     "NamedProbability",
     "NumericMoments",
+    "PlayerEvidenceKind",
+    "PlayerPosition",
+    "PlayerStateDimension",
+    "PlayerStateEstimatorConfig",
+    "PlayerStateEvidenceConflictError",
+    "PlayerStateEvidenceObservation",
+    "PlayerStatePayload",
     "PracticeStatus",
     "Probability",
     "StateCoverage",
@@ -86,14 +115,21 @@ __all__ = [
     "UnknownQuantity",
     "build_injury_availability_snapshot",
     "build_injury_state_as_of",
+    "build_player_state_as_of",
+    "build_player_state_snapshot",
     "build_state_snapshot",
+    "canonical_position_metrics",
     "canonical_state_json",
     "injury_episode_revisions_as_of",
     "injury_observations_as_of",
+    "player_evidence_metrics_sha256",
+    "player_state_evidence_as_of",
     "record_injury_episode_revision",
     "record_injury_observation",
+    "record_player_state_evidence",
     "record_state_snapshot",
     "require_state_snapshot_sealed",
+    "resolve_player_position",
     "state_snapshot_is_sealed",
     "verify_state_snapshot_identity",
 ]
