@@ -393,7 +393,9 @@ def _observation_weight(
         0.0,
         (as_of - observation.knowledge.available_at).total_seconds() / 86400.0,
     )
-    recency_weight = 0.5 ** (age_days / config.half_life_days(observation.evidence_kind))
+    recency_weight = math.exp2(
+        -age_days / config.half_life_days(observation.evidence_kind)
+    )
     return observation.sample_weight * observation.source_confidence.value * recency_weight
 
 
