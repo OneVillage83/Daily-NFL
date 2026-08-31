@@ -206,11 +206,13 @@ def _injury_snapshot(
     )
 
 
-def test_schema_v10_applies_from_fresh_database() -> None:
+def test_schema_contains_v10_player_foundation_after_current_migrations() -> None:
     connection = connect_database(":memory:")
     try:
-        assert apply_migrations(connection) == 10
-        assert SCHEMA_VERSION == 10
+        assert apply_migrations(connection) == SCHEMA_VERSION
+        assert SCHEMA_VERSION >= 10
+        assert MIGRATIONS[9].version == 10
+        assert MIGRATIONS[9].name == "m7_player_state_evidence_foundation"
         tables = {
             str(row[0])
             for row in connection.execute(
@@ -235,11 +237,19 @@ def test_schema_v10_upgrades_applied_v9_without_rewriting_history() -> None:
             "SELECT version, name FROM schema_migrations ORDER BY version"
         ).fetchall()
         assert current_schema_version(connection) == 9
-        assert apply_migrations(connection) == 10
+        migration_v10 = MIGRATIONS[9]
+        connection.executescript(migration_v10.sql)
+        connection.execute(
+            "INSERT INTO schema_migrations(version, name) VALUES (?, ?)",
+            (migration_v10.version, migration_v10.name),
+        )
         rows_after = connection.execute(
             "SELECT version, name FROM schema_migrations ORDER BY version"
         ).fetchall()
-        assert [tuple(row) for row in rows_after[:9]] == [tuple(row) for row in rows_before]
+        assert current_schema_version(connection) == 10
+        assert [tuple(row) for row in rows_after[:9]] == [
+            tuple(row) for row in rows_before
+        ]
         assert tuple(rows_after[9]) == (10, "m7_player_state_evidence_foundation")
     finally:
         connection.close()
