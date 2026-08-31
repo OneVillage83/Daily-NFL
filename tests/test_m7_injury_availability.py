@@ -157,11 +157,14 @@ def _episode(
     )
 
 
-def test_schema_v9_applies_from_fresh_database() -> None:
+def test_schema_contains_v9_injury_foundation_after_later_migrations() -> None:
     connection = connect_database(":memory:")
     try:
-        assert apply_migrations(connection) == 9
-        assert SCHEMA_VERSION == 9
+        assert apply_migrations(connection) == SCHEMA_VERSION
+        assert SCHEMA_VERSION >= 9
+        assert current_schema_version(connection) == SCHEMA_VERSION
+        assert MIGRATIONS[8].version == 9
+        assert MIGRATIONS[8].name == "m7_injury_availability_foundation"
         tables = {
             str(row[0])
             for row in connection.execute(
@@ -179,7 +182,7 @@ def test_schema_v9_applies_from_fresh_database() -> None:
         connection.close()
 
 
-def test_schema_v9_upgrades_applied_v8_without_rewriting_history() -> None:
+def test_migration_v9_upgrades_applied_v8_without_rewriting_history() -> None:
     connection = connect_database(":memory:")
     try:
         for migration in MIGRATIONS[:8]:
@@ -192,7 +195,15 @@ def test_schema_v9_upgrades_applied_v8_without_rewriting_history() -> None:
             "SELECT version, name FROM schema_migrations ORDER BY version"
         ).fetchall()
         assert current_schema_version(connection) == 8
-        assert apply_migrations(connection) == 9
+
+        migration_v9 = MIGRATIONS[8]
+        connection.executescript(migration_v9.sql)
+        connection.execute(
+            "INSERT INTO schema_migrations(version, name) VALUES (?, ?)",
+            (migration_v9.version, migration_v9.name),
+        )
+
+        assert current_schema_version(connection) == 9
         rows_after = connection.execute(
             "SELECT version, name FROM schema_migrations ORDER BY version"
         ).fetchall()
