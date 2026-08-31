@@ -21,6 +21,7 @@ class StateType(StrEnum):
 
 class StateSubjectType(StrEnum):
     PLAYER = "PLAYER"
+    UNIT = "UNIT"
     UNIT_CONFIGURATION = "UNIT_CONFIGURATION"
     COACHING_REGIME = "COACHING_REGIME"
     TEAM_SEASON = "TEAM_SEASON"
