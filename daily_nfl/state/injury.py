@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, fields
 from datetime import datetime
 from enum import StrEnum
 
@@ -23,13 +24,13 @@ from daily_nfl.state.contracts import (
 )
 from daily_nfl.state.snapshot import build_state_snapshot
 from daily_nfl.state.uncertainty import (
+    MissingnessReason,
     NamedMoments,
     NamedProbability,
     NumericMoments,
     Probability,
     StateUncertainty,
     UnknownQuantity,
-    MissingnessReason,
 )
 
 
@@ -84,9 +85,10 @@ def _require_nonblank(value: str, label: str) -> None:
 
 
 def _require_unit_interval(value: float, label: str) -> None:
-    Probability(value)
-    if label.endswith("variance") and value > 0.25:
-        raise ValueError(f"{label} cannot exceed 0.25 for a [0, 1] quantity")
+    try:
+        Probability(value)
+    except ValueError as error:
+        raise ValueError(f"{label} must be between 0 and 1") from error
 
 
 @dataclass(frozen=True, slots=True)
@@ -267,14 +269,17 @@ class InjuryEstimatorConfig:
 
     def __post_init__(self) -> None:
         _require_nonblank(self.version, "injury estimator version")
-        for name, value in self.__dict__.items():
-            if name == "version":
+        for field in fields(self):
+            if field.name == "version":
                 continue
-            if name.endswith("variance"):
+            value = getattr(self, field.name)
+            if not isinstance(value, float):
+                raise TypeError(f"{field.name} must be a float")
+            if field.name.endswith("variance"):
                 if value < 0.0 or value > 0.25:
-                    raise ValueError(f"{name} must be between 0 and 0.25")
+                    raise ValueError(f"{field.name} must be between 0 and 0.25")
             else:
-                _require_unit_interval(value, name)
+                _require_unit_interval(value, field.name)
 
 
 DEFAULT_INJURY_ESTIMATOR_CONFIG = InjuryEstimatorConfig()
@@ -282,17 +287,21 @@ DEFAULT_INJURY_ESTIMATOR_CONFIG = InjuryEstimatorConfig()
 
 def _latest_status[T: StrEnum](
     observations: tuple[InjuryObservation, ...],
-    attribute: str,
+    selector: Callable[[InjuryObservation], T],
     unknown: T,
 ) -> T:
-    candidates: list[tuple[datetime, T]] = []
-    for observation in observations:
-        value = getattr(observation, attribute)
-        if value != unknown:
-            candidates.append((observation.knowledge.available_at, value))
+    candidates = [
+        (
+            observation.knowledge.available_at,
+            str(observation.injury_observation_id),
+            selector(observation),
+        )
+        for observation in observations
+        if selector(observation) != unknown
+    ]
     if not candidates:
         return unknown
-    return max(candidates, key=lambda item: item[0])[1]
+    return max(candidates, key=lambda item: (item[0], item[1]))[2]
 
 
 def _game_active_probability(status: GameDesignation, config: InjuryEstimatorConfig) -> float:
@@ -416,13 +425,28 @@ def build_injury_availability_snapshot(
         if not set(episode.observation_ids).issubset(observation_ids):
             raise ValueError("injury episode observations must be included in snapshot inputs")
 
-    practice = _latest_status(observations, "practice_status", PracticeStatus.UNKNOWN)
-    game_status = _latest_status(observations, "game_status", GameDesignation.UNKNOWN)
-    active_status = _latest_status(observations, "active_status", ActiveStatus.UNKNOWN)
+    practice = _latest_status(
+        observations,
+        lambda observation: observation.practice_status,
+        PracticeStatus.UNKNOWN,
+    )
+    game_status = _latest_status(
+        observations,
+        lambda observation: observation.game_status,
+        GameDesignation.UNKNOWN,
+    )
+    active_status = _latest_status(
+        observations,
+        lambda observation: observation.active_status,
+        ActiveStatus.UNKNOWN,
+    )
 
     active_probability = min(
         1.0,
-        max(0.0, _game_active_probability(game_status, config) * _practice_multiplier(practice, config)),
+        max(
+            0.0,
+            _game_active_probability(game_status, config) * _practice_multiplier(practice, config),
+        ),
     )
     if active_status is ActiveStatus.INACTIVE:
         active_probability = 0.0
@@ -462,17 +486,11 @@ def build_injury_availability_snapshot(
 
     unknowns: list[UnknownQuantity] = []
     if practice is PracticeStatus.UNKNOWN:
-        unknowns.append(
-            UnknownQuantity("practice_status", MissingnessReason.DATA_UNAVAILABLE)
-        )
+        unknowns.append(UnknownQuantity("practice_status", MissingnessReason.DATA_UNAVAILABLE))
     if game_status is GameDesignation.UNKNOWN:
-        unknowns.append(
-            UnknownQuantity("game_status", MissingnessReason.DATA_UNAVAILABLE)
-        )
+        unknowns.append(UnknownQuantity("game_status", MissingnessReason.DATA_UNAVAILABLE))
     if active_status is ActiveStatus.UNKNOWN:
-        unknowns.append(
-            UnknownQuantity("active_status", MissingnessReason.DATA_UNAVAILABLE)
-        )
+        unknowns.append(UnknownQuantity("active_status", MissingnessReason.DATA_UNAVAILABLE))
     uncertainty = StateUncertainty(
         probabilities=(
             NamedProbability("availability_probability", availability),
@@ -497,8 +515,6 @@ def build_injury_availability_snapshot(
         state_payload=payload,
         uncertainty=uncertainty,
         coverage=_coverage(observations, episode_revisions, practice, game_status, active_status),
-        input_observations=tuple(
-            observation.to_pit_input_ref() for observation in observations
-        ),
+        input_observations=tuple(observation.to_pit_input_ref() for observation in observations),
         created_at=created_at,
     )
