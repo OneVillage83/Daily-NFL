@@ -157,8 +157,12 @@ def _metric_names(metrics: tuple[NamedMoments, ...]) -> list[str]:
     return [metric.name for metric in metrics]
 
 
+def _canonical_metrics(metrics: tuple[NamedMoments, ...]) -> tuple[NamedMoments, ...]:
+    return tuple(sorted(metrics, key=lambda metric: metric.name))
+
+
 def player_evidence_metrics_sha256(metrics: tuple[NamedMoments, ...]) -> str:
-    encoded = canonical_state_json(metrics).encode("utf-8")
+    encoded = canonical_state_json(_canonical_metrics(metrics)).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
 
 
@@ -222,6 +226,10 @@ class PlayerStateEvidenceObservation:
     def metrics_sha256(self) -> str:
         return player_evidence_metrics_sha256(self.metrics)
 
+    @property
+    def payload_sha256(self) -> str:
+        return player_evidence_payload_sha256(self)
+
     def to_pit_input_ref(self) -> PITInputRef:
         return PITInputRef(
             input_kind=PITInputKind.OTHER,
@@ -241,9 +249,32 @@ class PlayerStateEvidenceObservation:
             published_at=self.knowledge.published_at,
             observed_at=self.knowledge.observed_at,
             ingested_at=self.knowledge.ingested_at,
-            payload_sha256=self.metrics_sha256,
+            payload_sha256=self.payload_sha256,
             raw_sha256=self.raw_sha256,
         )
+
+
+def player_evidence_payload_sha256(observation: PlayerStateEvidenceObservation) -> str:
+    payload = {
+        "player_id": str(observation.player_id),
+        "logical_key": observation.logical_key,
+        "revision": observation.revision,
+        "team_season_id": (
+            str(observation.team_season_id) if observation.team_season_id is not None else None
+        ),
+        "source_game_id": (
+            str(observation.source_game_id) if observation.source_game_id is not None else None
+        ),
+        "position": observation.position.value,
+        "evidence_kind": observation.evidence_kind.value,
+        "metrics": _canonical_metrics(observation.metrics),
+        "sample_weight": observation.sample_weight,
+        "source_confidence": observation.source_confidence.value,
+        "evidence_contract": observation.evidence_contract,
+        "evidence_version": observation.evidence_version,
+    }
+    encoded = canonical_state_json(payload).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 @dataclass(frozen=True, slots=True)
