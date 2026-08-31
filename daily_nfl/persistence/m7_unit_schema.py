@@ -21,6 +21,7 @@ CREATE TABLE unit_configuration_observations (
     ),
     logical_key TEXT NOT NULL,
     revision INTEGER NOT NULL CHECK (revision >= 1),
+    availability_basis TEXT NOT NULL CHECK (availability_basis = 'ROLE_PRIOR_ONLY'),
     distribution_json TEXT NOT NULL,
     distribution_sha256 TEXT NOT NULL,
     payload_sha256 TEXT NOT NULL,
