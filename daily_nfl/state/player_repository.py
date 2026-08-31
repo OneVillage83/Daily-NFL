@@ -67,7 +67,7 @@ def _metrics_json(observation: PlayerStateEvidenceObservation) -> str:
             "mean": metric.estimate.mean,
             "variance": metric.estimate.variance,
         }
-        for metric in observation.metrics
+        for metric in sorted(observation.metrics, key=lambda item: item.name)
     ]
     return json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
@@ -111,6 +111,7 @@ def _row_values(observation: PlayerStateEvidenceObservation) -> tuple[object, ..
         observation.evidence_kind.value,
         _metrics_json(observation),
         observation.metrics_sha256,
+        observation.payload_sha256,
         observation.sample_weight,
         observation.source_confidence.value,
         observation.evidence_contract,
@@ -179,6 +180,10 @@ def _row_to_observation(row: sqlite3.Row) -> PlayerStateEvidenceObservation:
         raise PlayerStateEvidenceConflictError(
             f"stored player evidence {observation.observation_id!s} has invalid metrics hash"
         )
+    if observation.payload_sha256 != str(row["payload_sha256"]):
+        raise PlayerStateEvidenceConflictError(
+            f"stored player evidence {observation.observation_id!s} has invalid payload hash"
+        )
     return observation
 
 
@@ -192,9 +197,9 @@ def record_player_state_evidence(
         """
         SELECT observation_id, player_id, logical_key, revision, team_season_id,
                source_game_id, position, evidence_kind, metrics_json, metrics_sha256,
-               sample_weight, source_confidence, evidence_contract, evidence_version,
-               provider_id, evidence_id, evidence_observation_id, effective_at,
-               published_at, observed_at, ingested_at, available_at,
+               payload_sha256, sample_weight, source_confidence, evidence_contract,
+               evidence_version, provider_id, evidence_id, evidence_observation_id,
+               effective_at, published_at, observed_at, ingested_at, available_at,
                availability_method, availability_confidence, provider_revision,
                provider_schema_version, parser_version, raw_sha256
         FROM player_state_evidence_observations
@@ -215,12 +220,15 @@ def record_player_state_evidence(
         INSERT INTO player_state_evidence_observations(
             observation_id, player_id, logical_key, revision, team_season_id,
             source_game_id, position, evidence_kind, metrics_json, metrics_sha256,
-            sample_weight, source_confidence, evidence_contract, evidence_version,
-            provider_id, evidence_id, evidence_observation_id, effective_at,
-            published_at, observed_at, ingested_at, available_at,
+            payload_sha256, sample_weight, source_confidence, evidence_contract,
+            evidence_version, provider_id, evidence_id, evidence_observation_id,
+            effective_at, published_at, observed_at, ingested_at, available_at,
             availability_method, availability_confidence, provider_revision,
             provider_schema_version, parser_version, raw_sha256
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?, ?, ?, ?, ?
+        )
         """,
         values,
     )
@@ -242,9 +250,9 @@ def player_state_evidence_as_of(
         """
         SELECT observation_id, player_id, logical_key, revision, team_season_id,
                source_game_id, position, evidence_kind, metrics_json, metrics_sha256,
-               sample_weight, source_confidence, evidence_contract, evidence_version,
-               provider_id, evidence_id, evidence_observation_id, effective_at,
-               published_at, observed_at, ingested_at, available_at,
+               payload_sha256, sample_weight, source_confidence, evidence_contract,
+               evidence_version, provider_id, evidence_id, evidence_observation_id,
+               effective_at, published_at, observed_at, ingested_at, available_at,
                availability_method, availability_confidence, provider_revision,
                provider_schema_version, parser_version, raw_sha256
         FROM player_state_evidence_observations
