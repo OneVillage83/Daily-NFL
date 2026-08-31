@@ -5,7 +5,7 @@
 **Branch:** `checkpoint/m7-state-engine-v1`
 **Certified base:** `0dd515ec36f370ce70f67b3e771e1ceb4e36a149`
 **Architecture:** F-6, F-7, F-8, F-9, F-10
-**Status:** IN PROGRESS — GATE 0 CLOSED / M7-A STARTING
+**Status:** IN PROGRESS — M7-A CLOSED / M7-B STARTING
 
 This file is the authoritative resume point while M7 is open. Final certification status remains governed by `ARCHITECTURE_CERTIFICATION_LOG.md`.
 
@@ -17,6 +17,7 @@ This file is the authoritative resume point while M7 is open. Final certificatio
 - `docs/implementation/M7_STATE_ENGINE_V1_CONTRACT.md`
 - `docs/implementation/M7_PREIMPLEMENTATION_CONFORMANCE_AUDIT.md`
 - `docs/implementation/M7_GATE0_BASELINE_20260827.md`
+- `docs/implementation/M7_A_COMMON_STATE_CONTRACTS_RESULT.md`
 
 ## 2. Locked scope
 
@@ -40,7 +41,7 @@ M7 begins from M6C-certified `main`:
 main SHA: 0dd515ec36f370ce70f67b3e771e1ceb4e36a149
 M6C: ARCHITECTURE-CERTIFIED
 historical PBP compatibility: 1999-2025, 27/27 PASS
-schema version: 7
+schema version before M7-B: 7
 ```
 
 Reusable foundations:
@@ -52,45 +53,48 @@ Reusable foundations:
 - M6 canonical play/participation/drive evidence;
 - M6C full-history compatibility proof.
 
-## 4. Pre-implementation audit result
+## 4. Completed M7-A substrate
 
-The repo contains **no pre-existing M7 state-engine implementation**.
+M7-A introduced:
 
-Partial precursors:
+- opaque canonical state identifiers;
+- state type / subject type vocabulary;
+- immutable generic state-snapshot envelope;
+- exact expected/present/missing coverage;
+- structured uncertainty contracts for probabilities, numeric moments, bounded intervals, categorical mixtures, and explicit unknown quantities;
+- exact observation/dependency membership validation;
+- focused failure-state tests.
 
-- `PlayerId`, `TeamSeasonId`, `CoachRoleId`, `InjuryObservationId`, `DepthChartSnapshotId` exist;
-- `CoachingRole` and `RosterStint` are temporal identity contracts;
-- PIT snapshot hashing/input/sealing is a reusable architectural pattern.
+Validated M7-A head:
 
-Missing and required:
+```text
+9de3b61b738f934061918342d22ee29923cdb43b
+```
 
-- common state package;
-- state snapshot IDs/contracts;
-- uncertainty/distribution contracts;
-- migration v8;
-- state snapshot/input/dependency persistence;
-- injury observation/episode/availability state;
-- player state;
-- unit configuration/state;
-- coaching regime/scheme state;
-- team state;
-- dependency DAG/double-counting guard;
-- deterministic V1 estimators;
-- PIT propagation validation.
+M7-A local gate:
+
+```text
+focused pytest: 26 passed
+Ruff: PASS
+strict mypy: PASS — 100 source files
+full pytest: PASS — 215 tests
+git diff --check: PASS
+working tree: clean
+```
 
 ## 5. Build sequence
 
 ```text
-M7-A  Common state contracts / IDs / uncertainty
-M7-B  Migration v8 + state snapshot/input/dependency ledger
-M7-C  Injury observation / episode / availability
-M7-D  Player State V1
-M7-E  Unit State V1
-M7-F  Coaching & Scheme State V1
-M7-G  Team State V1
-M7-H  Dependency propagation / rebuild inspection
-M7-I  PIT multi-snapshot validation
-M7-J  Historical/real-data validation + certification
+M7-A  Common state contracts / IDs / uncertainty           CLOSED / PASS
+M7-B  Migration v8 + state snapshot/input/dependency ledger IN PROGRESS
+M7-C  Injury observation / episode / availability           NOT STARTED
+M7-D  Player State V1                                       NOT STARTED
+M7-E  Unit State V1                                         NOT STARTED
+M7-F  Coaching & Scheme State V1                            NOT STARTED
+M7-G  Team State V1                                         NOT STARTED
+M7-H  Dependency propagation / rebuild inspection           NOT STARTED
+M7-I  PIT multi-snapshot validation                         NOT STARTED
+M7-J  Historical/real-data validation + certification       NOT STARTED
 ```
 
 ## 6. Gate 0 evidence
@@ -122,7 +126,7 @@ foreign_keys_enabled: true
 integrity_ok: true
 ```
 
-Gate 0 is formally **CLOSED / PASS**. M7 executable work is authorized.
+Gate 0 is formally **CLOSED / PASS**.
 
 ## 7. Gate state
 
@@ -130,8 +134,8 @@ Gate 0 is formally **CLOSED / PASS**. M7 executable work is authorized.
 M7 contract                       LOCKED
 Pre-implementation audit          COMPLETE
 Gate 0 local/static baseline      CLOSED / PASS
-M7-A common contracts             IN PROGRESS
-M7-B migration/persistence        NOT STARTED
+M7-A common contracts             CLOSED / PASS
+M7-B migration/persistence        IN PROGRESS
 M7-C injury/availability          NOT STARTED
 M7-D player state                 NOT STARTED
 M7-E unit state                   NOT STARTED
@@ -145,19 +149,24 @@ M7 certification                  WITHHELD
 
 ## 8. Immediate next action
 
-Implement **M7-A Common State Contracts / IDs / Uncertainty**.
+Implement **M7-B Migration v8 + immutable state ledger**.
 
-M7-A must establish the reusable provider-neutral primitives required by every later M7 family:
+Required M7-B proof:
 
-- canonical state identifiers;
-- state type / subject type vocabulary;
-- immutable snapshot-envelope metadata contract;
-- structured coverage/missingness;
-- probability / moments / interval / categorical-mixture uncertainty types;
-- strict finite/range/normalization validation;
-- deterministic serialization inputs suitable for later M7-B hashing and persistence.
+- migrations 1-7 remain unchanged;
+- forward-only migration v8 applies from fresh DB and certified v7;
+- `state_snapshots`, `state_snapshot_inputs`, `state_snapshot_dependencies`, and `state_snapshot_seals` are created;
+- snapshot identity is deterministic from semantic state content, exact observation inputs, and exact parent-state dependencies;
+- payload hashing and canonical serialization are deterministic;
+- identical replay is idempotent;
+- conflicting identity/payload fails closed;
+- parent snapshots must be sealed and cannot be later than the child `as_of`;
+- cycle/self-dependency attempts fail closed;
+- observation inputs cannot be later than snapshot `as_of`;
+- sealed snapshot membership cannot be extended or mutated;
+- all ledger components are append-only.
 
-No migration or family-specific state estimator should be added until these shared contracts are validated locally.
+M7-C must not begin until M7-B persistence semantics and schema v8 are locally validated.
 
 ## 9. Update rule
 
