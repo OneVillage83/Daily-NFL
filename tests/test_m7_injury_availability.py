@@ -40,7 +40,6 @@ from daily_nfl.state import (
     state_snapshot_is_sealed,
 )
 
-
 PLAYER_ID = PlayerId("player-injury-1")
 TEAM_ID = TeamSeasonId("team-home-2026")
 GAME_ID = GameId("game-injury-1")
