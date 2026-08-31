@@ -6,18 +6,14 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from daily_nfl.domain import StateSnapshotId
+from daily_nfl.domain import AvailabilityConfidence, AvailabilityMethod, StateSnapshotId
 from daily_nfl.persistence import SCHEMA_VERSION, apply_migrations, connect_database
 from daily_nfl.persistence.migrations import MIGRATIONS, current_schema_version
-from daily_nfl.pit import (
-    AvailabilityConfidence,
-    AvailabilityMethod,
-    PITInputKind,
-    PITInputRef,
-)
+from daily_nfl.pit import PITInputKind, PITInputRef
 from daily_nfl.state import (
     StateCoverage,
     StateSnapshotConflictError,
+    StateSnapshotEnvelope,
     StateSnapshotIdentityError,
     StateSubjectType,
     StateType,
@@ -29,6 +25,8 @@ from daily_nfl.state import (
     verify_state_snapshot_identity,
 )
 
+
+type TestPayload = dict[str, float | str]
 
 AS_OF = datetime(2026, 9, 13, 16, 0, tzinfo=UTC)
 CREATED_AT = AS_OF + timedelta(minutes=1)
@@ -57,10 +55,10 @@ def _snapshot(
     *,
     quality: float = 0.5,
     inputs: tuple[PITInputRef, ...] = (),
-    parents: tuple[object, ...] = (),
+    parents: tuple[StateSnapshotEnvelope[TestPayload], ...] = (),
     as_of: datetime = AS_OF,
     created_at: datetime = CREATED_AT,
-):
+) -> StateSnapshotEnvelope[TestPayload]:
     return build_state_snapshot(
         state_type=StateType.TEAM,
         subject_type=StateSubjectType.TEAM_SEASON,
@@ -175,10 +173,12 @@ def test_record_state_snapshot_persists_exact_membership_and_seal() -> None:
         ).fetchone()
         assert row is not None
         assert (int(row[0]), int(row[1])) == (1, 1)
-        assert connection.execute(
+        dependency_row = connection.execute(
             "SELECT parent_snapshot_id FROM state_snapshot_dependencies WHERE snapshot_id = ?",
             (str(child.snapshot_id),),
-        ).fetchone()[0] == str(parent.snapshot_id)
+        ).fetchone()
+        assert dependency_row is not None
+        assert str(dependency_row[0]) == str(parent.snapshot_id)
     finally:
         connection.close()
 
@@ -196,11 +196,12 @@ def test_identical_replay_is_idempotent_even_when_created_at_differs() -> None:
         record_state_snapshot(connection, first)
         record_state_snapshot(connection, replay)
 
-        count = connection.execute(
+        count_row = connection.execute(
             "SELECT COUNT(*) FROM state_snapshots WHERE snapshot_id = ?",
             (str(first.snapshot_id),),
-        ).fetchone()[0]
-        assert int(count) == 1
+        ).fetchone()
+        assert count_row is not None
+        assert int(count_row[0]) == 1
     finally:
         connection.close()
 
