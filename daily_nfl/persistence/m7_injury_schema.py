@@ -133,7 +133,11 @@ END;
 
 CREATE TRIGGER injury_observations_require_raw_provenance
 BEFORE INSERT ON injury_observations
-WHEN (NEW.evidence_id IS NOT NULL OR NEW.evidence_observation_id IS NOT NULL OR NEW.raw_sha256 IS NOT NULL)
+WHEN (
+    NEW.evidence_id IS NOT NULL
+    OR NEW.evidence_observation_id IS NOT NULL
+    OR NEW.raw_sha256 IS NOT NULL
+)
  AND (
     NEW.evidence_id IS NULL
     OR NEW.evidence_observation_id IS NULL
@@ -238,6 +242,9 @@ WHEN NOT EXISTS (
       )
 )
 BEGIN
-    SELECT RAISE(ABORT, 'injury episode revision cannot seal before exact PIT-safe membership is complete');
+    SELECT RAISE(
+        ABORT,
+        'injury episode revision cannot seal before exact PIT-safe membership is complete'
+    );
 END;
 """
