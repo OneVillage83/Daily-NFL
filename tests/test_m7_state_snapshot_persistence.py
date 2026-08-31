@@ -25,7 +25,6 @@ from daily_nfl.state import (
     verify_state_snapshot_identity,
 )
 
-
 type TestPayload = dict[str, float | str]
 
 AS_OF = datetime(2026, 9, 13, 16, 0, tzinfo=UTC)
