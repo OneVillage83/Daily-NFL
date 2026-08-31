@@ -404,17 +404,18 @@ def _aggregate_dimension(
     config: PlayerStateEstimatorConfig,
 ) -> PlayerStateDimension:
     weighted_metrics: dict[str, list[tuple[NumericMoments, float]]] = {}
-    effective_weight = 0.0
+    contributing_weights: list[float] = []
     contributing_observations = 0
     for observation in observations:
         weight = _observation_weight(observation, as_of=as_of, config=config)
         if weight <= 0.0:
             continue
-        effective_weight += weight
+        contributing_weights.append(weight)
         contributing_observations += 1
         for metric in observation.metrics:
             weighted_metrics.setdefault(metric.name, []).append((metric.estimate, weight))
 
+    effective_weight = math.fsum(contributing_weights)
     metrics: list[NamedMoments] = []
     for name in sorted(weighted_metrics):
         members = weighted_metrics[name]
