@@ -15,7 +15,11 @@ from daily_nfl.domain import (
     PlayerId,
     TeamSeasonId,
 )
-from daily_nfl.persistence import SCHEMA_VERSION, apply_migrations, connect_database
+from daily_nfl.persistence import (
+    SCHEMA_VERSION,
+    apply_migrations,
+    connect_database,
+)
 from daily_nfl.persistence.migrations import MIGRATIONS, current_schema_version
 from daily_nfl.state import (
     ActiveStatus,
@@ -52,7 +56,8 @@ def _connection() -> sqlite3.Connection:
 
 def _seed_core(connection: sqlite3.Connection) -> None:
     connection.execute(
-        "INSERT INTO providers(provider_id, name, provider_type) VALUES ('injury-test', 'Injury Test', 'TEST')"
+        "INSERT INTO providers(provider_id, name, provider_type) "
+        "VALUES ('injury-test', 'Injury Test', 'TEST')"
     )
     connection.execute(
         "INSERT INTO franchises(franchise_id, canonical_name) VALUES ('fr-home', 'Home')"
@@ -218,7 +223,8 @@ def test_injury_observation_is_idempotent_append_only_and_pit_selectable() -> No
         assert selected == (observation,)
         with pytest.raises(sqlite3.IntegrityError, match="append-only"):
             connection.execute(
-                "UPDATE injury_observations SET game_status = 'OUT' WHERE injury_observation_id = ?",
+                "UPDATE injury_observations SET game_status = 'OUT' "
+                "WHERE injury_observation_id = ?",
                 (str(observation.injury_observation_id),),
             )
     finally:
