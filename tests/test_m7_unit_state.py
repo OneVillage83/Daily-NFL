@@ -40,6 +40,7 @@ from daily_nfl.state import (
     UnitEvidenceKind,
     UnitMemberAssignment,
     UnitStateEvidenceObservation,
+    UnitStatePayload,
     UnitType,
     build_injury_availability_snapshot,
     build_player_state_snapshot,
@@ -345,7 +346,7 @@ def _unit_snapshot(
     as_of: datetime,
     starter_status: ActiveStatus = ActiveStatus.ACTIVE,
     evidence: tuple[UnitStateEvidenceObservation, ...] = (),
-) -> StateSnapshotEnvelope[object]:
+) -> StateSnapshotEnvelope[UnitStatePayload]:
     _, players = _players(as_of=as_of - timedelta(minutes=5), starter_status=starter_status)
     return build_unit_state_snapshot(
         team_season_id=TEAM_ID,
@@ -737,23 +738,26 @@ def test_current_target_game_direct_unit_evidence_fails_closed() -> None:
 
 def test_unit_state_identity_is_player_parent_order_independent() -> None:
     _, players = _players(as_of=BASE - timedelta(hours=5))
-    kwargs = {
-        "team_season_id": TEAM_ID,
-        "game_id": GAME_ID,
-        "unit_type": UNIT_TYPE,
-        "as_of": BASE - timedelta(hours=4),
-        "configuration_observations": (
-            _configuration(1, available_at=BASE - timedelta(hours=6)),
-        ),
-        "unit_evidence": (),
-    }
+    configuration_observations = (
+        _configuration(1, available_at=BASE - timedelta(hours=6)),
+    )
     first = build_unit_state_snapshot(
-        **kwargs,
+        team_season_id=TEAM_ID,
+        game_id=GAME_ID,
+        unit_type=UNIT_TYPE,
+        as_of=BASE - timedelta(hours=4),
+        configuration_observations=configuration_observations,
+        unit_evidence=(),
         player_snapshots=players,
         created_at=BASE,
     )
     second = build_unit_state_snapshot(
-        **kwargs,
+        team_season_id=TEAM_ID,
+        game_id=GAME_ID,
+        unit_type=UNIT_TYPE,
+        as_of=BASE - timedelta(hours=4),
+        configuration_observations=configuration_observations,
+        unit_evidence=(),
         player_snapshots=tuple(reversed(players)),
         created_at=BASE + timedelta(hours=1),
     )
