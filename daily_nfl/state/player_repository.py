@@ -259,9 +259,14 @@ def player_state_evidence_as_of(
         WHERE player_id = ?
           AND available_at <= ?
           AND (source_game_id IS NULL OR source_game_id <> ?)
+          AND (
+              evidence_kind = 'TALENT'
+              OR team_season_id IS NULL
+              OR team_season_id = ?
+          )
         ORDER BY logical_key, revision, available_at, observation_id
         """,
-        (str(player_id), _iso(as_of), str(target_game_id)),
+        (str(player_id), _iso(as_of), str(target_game_id), str(team_season_id)),
     ).fetchall()
 
     latest_by_key: dict[str, PlayerStateEvidenceObservation] = {}
@@ -271,14 +276,9 @@ def player_state_evidence_as_of(
         if existing is None or observation.revision > existing.revision:
             latest_by_key[observation.logical_key] = observation
 
-    selected: list[PlayerStateEvidenceObservation] = []
-    for observation in latest_by_key.values():
-        if observation.evidence_kind is PlayerEvidenceKind.TALENT:
-            selected.append(observation)
-            continue
-        if observation.team_season_id in (None, team_season_id):
-            selected.append(observation)
-    return tuple(sorted(selected, key=lambda item: str(item.observation_id)))
+    return tuple(
+        sorted(latest_by_key.values(), key=lambda item: str(item.observation_id))
+    )
 
 
 def build_player_state_as_of(
