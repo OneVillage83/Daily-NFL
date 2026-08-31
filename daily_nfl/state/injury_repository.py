@@ -15,16 +15,18 @@ from daily_nfl.domain import (
     PlayerId,
     TeamSeasonId,
 )
+from daily_nfl.state.contracts import StateSnapshotEnvelope
 from daily_nfl.state.injury import (
+    DEFAULT_INJURY_ESTIMATOR_CONFIG,
     ActiveStatus,
     GameDesignation,
+    InjuryAvailabilityState,
     InjuryEpisodeRevision,
     InjuryEstimatorConfig,
     InjuryLaterality,
     InjuryObservation,
     InjuryResolutionState,
     PracticeStatus,
-    DEFAULT_INJURY_ESTIMATOR_CONFIG,
     build_injury_availability_snapshot,
 )
 from daily_nfl.state.repository import record_state_snapshot
@@ -445,8 +447,8 @@ def build_injury_state_as_of(
     as_of: datetime,
     created_at: datetime,
     config: InjuryEstimatorConfig = DEFAULT_INJURY_ESTIMATOR_CONFIG,
-):
-    """Reconstruct and build the exact F-10 state knowable at a cutoff."""
+) -> StateSnapshotEnvelope[InjuryAvailabilityState]:
+    """Reconstruct, persist, and return the exact F-10 state knowable at a cutoff."""
 
     observations = injury_observations_as_of(
         connection,
