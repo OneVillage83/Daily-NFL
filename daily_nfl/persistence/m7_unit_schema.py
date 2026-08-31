@@ -90,6 +90,8 @@ CREATE TABLE unit_state_evidence_observations (
     source_confidence REAL NOT NULL CHECK (
         source_confidence >= 0.0 AND source_confidence <= 1.0
     ),
+    residualized_against_player_state INTEGER NOT NULL DEFAULT 0
+        CHECK (residualized_against_player_state IN (0, 1)),
     evidence_contract TEXT NOT NULL,
     evidence_version TEXT NOT NULL,
     provider_id TEXT REFERENCES providers(provider_id),
@@ -114,7 +116,13 @@ CREATE TABLE unit_state_evidence_observations (
     CHECK (trim(evidence_contract) <> ''),
     CHECK (trim(evidence_version) <> ''),
     CHECK (length(metrics_sha256) = 64),
-    CHECK (length(payload_sha256) = 64)
+    CHECK (length(payload_sha256) = 64),
+    CHECK (
+        evidence_kind NOT IN (
+            'ROLE_COMPATIBILITY', 'SYNERGY', 'RECENT_PERFORMANCE'
+        )
+        OR residualized_against_player_state = 1
+    )
 );
 
 CREATE INDEX idx_unit_state_evidence_lookup
