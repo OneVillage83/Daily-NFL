@@ -60,6 +60,8 @@ from daily_nfl.domain.ids import (
     TeamSeasonId,
     TeamStateId,
     UnitConfigurationId,
+    UnitConfigurationObservationId,
+    UnitStateEvidenceObservationId,
     UnitStateId,
     VenueId,
 )
@@ -143,6 +145,8 @@ __all__ = [
     "TeamSeasonId",
     "TeamStateId",
     "UnitConfigurationId",
+    "UnitConfigurationObservationId",
+    "UnitStateEvidenceObservationId",
     "UnitStateId",
     "VenueId",
     "Week",
