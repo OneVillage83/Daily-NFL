@@ -8,11 +8,12 @@ from daily_nfl.persistence.m2_conformance_schema import M2_CONFORMANCE_SCHEMA_SQ
 from daily_nfl.persistence.m3_provider_schema import M3_PROVIDER_SCHEMA_SQL
 from daily_nfl.persistence.m4_identity_conformance_schema import M4_IDENTITY_CONFORMANCE_SCHEMA_SQL
 from daily_nfl.persistence.m5_pit_conformance_schema import M5_PIT_CONFORMANCE_SCHEMA_SQL
+from daily_nfl.persistence.m7_injury_schema import M7_INJURY_SCHEMA_SQL
 from daily_nfl.persistence.m7_state_schema import M7_STATE_SCHEMA_SQL
 from daily_nfl.persistence.pit_schema import PIT_SNAPSHOT_SCHEMA_SQL
 from daily_nfl.persistence.schema import INITIAL_SCHEMA_SQL
 
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,7 +48,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(
         version=6,
         name="m4_identity_reconciliation_conformance",
-        sql=M4_IDENTITY_CONFORMANCE_SCHEMA_SQL,
+        sql=M4_IDENTITY_RECONCILIATION_SCHEMA_SQL,
     ),
     Migration(
         version=7,
@@ -58,6 +59,11 @@ MIGRATIONS: tuple[Migration, ...] = (
         version=8,
         name="m7_state_snapshot_foundation",
         sql=M7_STATE_SCHEMA_SQL,
+    ),
+    Migration(
+        version=9,
+        name="m7_injury_availability_foundation",
+        sql=M7_INJURY_SCHEMA_SQL,
     ),
 )
 
@@ -174,8 +180,7 @@ def apply_migrations(connection: sqlite3.Connection) -> int:
             continue
         if migration.version != expected_next:
             raise SchemaVersionError(
-                "migration sequence gap: "
-                f"expected version {expected_next}, found {migration.version}"
+                f"migration sequence gap: expected version {expected_next}, found {migration.version}"
             )
 
         escaped_name = migration.name.replace("'", "''")
