@@ -8,6 +8,8 @@ M7_PLAYER_SCHEMA_SQL = r"""
 CREATE TABLE player_state_evidence_observations (
     observation_id TEXT PRIMARY KEY,
     player_id TEXT NOT NULL REFERENCES players(player_id),
+    logical_key TEXT NOT NULL,
+    revision INTEGER NOT NULL CHECK (revision >= 1),
     team_season_id TEXT REFERENCES team_seasons(team_season_id),
     source_game_id TEXT REFERENCES games(game_id),
     position TEXT NOT NULL CHECK (
@@ -46,8 +48,10 @@ CREATE TABLE player_state_evidence_observations (
     parser_version TEXT,
     raw_sha256 TEXT,
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    UNIQUE(player_id, logical_key, revision),
     CHECK (trim(observation_id) <> ''),
     CHECK (trim(player_id) <> ''),
+    CHECK (trim(logical_key) <> ''),
     CHECK (trim(evidence_contract) <> ''),
     CHECK (trim(evidence_version) <> ''),
     CHECK (length(metrics_sha256) = 64)
@@ -55,6 +59,8 @@ CREATE TABLE player_state_evidence_observations (
 
 CREATE INDEX idx_player_state_evidence_player_available
     ON player_state_evidence_observations(player_id, available_at);
+CREATE INDEX idx_player_state_evidence_logical_revision
+    ON player_state_evidence_observations(player_id, logical_key, revision);
 CREATE INDEX idx_player_state_evidence_team_available
     ON player_state_evidence_observations(team_season_id, available_at);
 CREATE INDEX idx_player_state_evidence_source_game
