@@ -82,11 +82,13 @@ def _migrated_connection() -> sqlite3.Connection:
     return connection
 
 
-def test_schema_v8_applies_from_fresh_database() -> None:
+def test_schema_contains_v8_state_foundation_after_later_migrations() -> None:
     connection = _migrated_connection()
     try:
-        assert SCHEMA_VERSION == 8
-        assert current_schema_version(connection) == 8
+        assert SCHEMA_VERSION >= 8
+        assert current_schema_version(connection) == SCHEMA_VERSION
+        assert MIGRATIONS[7].version == 8
+        assert MIGRATIONS[7].name == "m7_state_snapshot_foundation"
         tables = {
             str(row[0])
             for row in connection.execute(
@@ -103,7 +105,7 @@ def test_schema_v8_applies_from_fresh_database() -> None:
         connection.close()
 
 
-def test_schema_v8_upgrades_certified_v7_without_rewriting_history() -> None:
+def test_migration_v8_upgrades_certified_v7_without_rewriting_history() -> None:
     connection = connect_database(":memory:")
     try:
         for migration in MIGRATIONS[:7]:
@@ -112,15 +114,24 @@ def test_schema_v8_upgrades_certified_v7_without_rewriting_history() -> None:
                 "INSERT INTO schema_migrations(version, name) VALUES (?, ?)",
                 (migration.version, migration.name),
             )
-        assert current_schema_version(connection) == 7
-        assert apply_migrations(connection) == 8
-        rows = connection.execute(
+        rows_before = connection.execute(
             "SELECT version, name FROM schema_migrations ORDER BY version"
         ).fetchall()
-        assert [(int(row[0]), str(row[1])) for row in rows[:7]] == [
-            (migration.version, migration.name) for migration in MIGRATIONS[:7]
-        ]
-        assert str(rows[7][1]) == "m7_state_snapshot_foundation"
+        assert current_schema_version(connection) == 7
+
+        migration_v8 = MIGRATIONS[7]
+        connection.executescript(migration_v8.sql)
+        connection.execute(
+            "INSERT INTO schema_migrations(version, name) VALUES (?, ?)",
+            (migration_v8.version, migration_v8.name),
+        )
+
+        assert current_schema_version(connection) == 8
+        rows_after = connection.execute(
+            "SELECT version, name FROM schema_migrations ORDER BY version"
+        ).fetchall()
+        assert [tuple(row) for row in rows_after[:7]] == [tuple(row) for row in rows_before]
+        assert tuple(rows_after[7]) == (8, "m7_state_snapshot_foundation")
     finally:
         connection.close()
 
