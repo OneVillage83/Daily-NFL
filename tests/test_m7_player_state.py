@@ -42,7 +42,6 @@ from daily_nfl.state import (
     state_snapshot_is_sealed,
 )
 
-
 PLAYER_ID = PlayerId("player-state-1")
 TEAM_ID = TeamSeasonId("team-current-2026")
 OLD_TEAM_ID = TeamSeasonId("team-old-2025")
