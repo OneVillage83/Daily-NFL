@@ -5,7 +5,7 @@
 **Branch:** `checkpoint/m7-state-engine-v1`
 **Certified base:** `0dd515ec36f370ce70f67b3e771e1ceb4e36a149`
 **Architecture:** F-6, F-7, F-8, F-9, F-10
-**Status:** IN PROGRESS — M7-B CLOSED / M7-C STARTING
+**Status:** IN PROGRESS — M7-C CLOSED / M7-D STARTING
 
 This file is the authoritative resume point while M7 is open. Final certification status remains governed by `ARCHITECTURE_CERTIFICATION_LOG.md`.
 
@@ -19,6 +19,7 @@ This file is the authoritative resume point while M7 is open. Final certificatio
 - `docs/implementation/M7_GATE0_BASELINE_20260827.md`
 - `docs/implementation/M7_A_COMMON_STATE_CONTRACTS_RESULT.md`
 - `docs/implementation/M7_B_STATE_PERSISTENCE_RESULT.md`
+- `docs/implementation/M7_C_INJURY_AVAILABILITY_RESULT.md`
 
 ## 2. Locked scope
 
@@ -44,6 +45,7 @@ M6C: ARCHITECTURE-CERTIFIED
 historical PBP compatibility: 1999-2025, 27/27 PASS
 schema before M7-B: 7
 schema after M7-B: 8
+schema after M7-C: 9
 ```
 
 Reusable foundations:
@@ -55,7 +57,8 @@ Reusable foundations:
 - M6 canonical play/participation/drive evidence;
 - M6C full-history compatibility proof;
 - M7-A state contracts/uncertainty substrate;
-- M7-B immutable state persistence ledger.
+- M7-B immutable state persistence ledger;
+- M7-C injury/availability state and PIT episode history.
 
 ## 4. Completed M7-A substrate
 
@@ -109,26 +112,59 @@ integrity_ok: true
 
 M7-B introduced deterministic content-addressed state snapshots, exact M5-compatible observation provenance, explicit state dependencies, atomic seals, append-only guards, cycle rejection, and idempotent replay.
 
-The initial cycle test failure was a test-expectation defect: the dedicated cycle guard correctly fired before the generic post-seal membership guard. The test was corrected without weakening production semantics.
+Migration v8 is immutable applied history.
 
-Migration v8 is now immutable applied history. Later M7 family-specific persistence must use new forward-only migrations rather than editing v8.
+## 6. Completed M7-C injury/availability state
 
-## 6. Build sequence
+Validated M7-C head:
 
 ```text
-M7-A  Common state contracts / IDs / uncertainty            CLOSED / PASS
-M7-B  Migration v8 + state snapshot/input/dependency ledger CLOSED / PASS
-M7-C  Injury observation / episode / availability            IN PROGRESS
-M7-D  Player State V1                                        NOT STARTED
-M7-E  Unit State V1                                          NOT STARTED
-M7-F  Coaching & Scheme State V1                             NOT STARTED
-M7-G  Team State V1                                          NOT STARTED
-M7-H  Dependency propagation / rebuild inspection            NOT STARTED
-M7-I  PIT multi-snapshot validation                          NOT STARTED
-M7-J  Historical/real-data validation + certification        NOT STARTED
+a9e1284073ee9c7a8a48bccf12bac9b900c88fa6
 ```
 
-## 7. Gate 0 evidence
+M7-C substantive local gate:
+
+```text
+focused pytest: 16 passed
+strict mypy: PASS — 108 source files
+full pytest: PASS — 245 tests
+schema upgrade: 8 -> 9
+schema check: 9 -> 9
+fresh schema: 0 -> 9
+fresh schema check: 9 -> 9
+foreign_keys_enabled: true
+integrity_ok: true
+git diff --check: PASS
+```
+
+Final formatting gate:
+
+```text
+Ruff: PASS
+working tree: clean
+local/remote branch SHA: exact match
+```
+
+M7-C introduced append-only injury observations, immutable/versioned injury episodes, explicit practice/game/active status separation, availability/participation/effectiveness separation, early-exit uncertainty, PIT-safe reconstruction, and late ACTIVE/INACTIVE immutable snapshot updates.
+
+Migration v9 is now immutable applied history. Later family-specific persistence must use forward-only migrations rather than modifying v8 or v9.
+
+## 7. Build sequence
+
+```text
+M7-A  Common state contracts / IDs / uncertainty             CLOSED / PASS
+M7-B  Migration v8 + state snapshot/input/dependency ledger  CLOSED / PASS
+M7-C  Injury observation / episode / availability             CLOSED / PASS
+M7-D  Player State V1                                         IN PROGRESS
+M7-E  Unit State V1                                           NOT STARTED
+M7-F  Coaching & Scheme State V1                              NOT STARTED
+M7-G  Team State V1                                           NOT STARTED
+M7-H  Dependency propagation / rebuild inspection             NOT STARTED
+M7-I  PIT multi-snapshot validation                           NOT STARTED
+M7-J  Historical/real-data validation + certification         NOT STARTED
+```
+
+## 8. Gate 0 evidence
 
 Exact tested documentation head:
 
@@ -159,7 +195,7 @@ integrity_ok: true
 
 Gate 0 is formally **CLOSED / PASS**.
 
-## 8. Gate state
+## 9. Gate state
 
 ```text
 M7 contract                       LOCKED
@@ -167,8 +203,8 @@ Pre-implementation audit          COMPLETE
 Gate 0 local/static baseline      CLOSED / PASS
 M7-A common contracts             CLOSED / PASS
 M7-B migration/persistence        CLOSED / PASS
-M7-C injury/availability          IN PROGRESS
-M7-D player state                 NOT STARTED
+M7-C injury/availability          CLOSED / PASS
+M7-D player state                 IN PROGRESS
 M7-E unit state                   NOT STARTED
 M7-F coaching/scheme              NOT STARTED
 M7-G team state                   NOT STARTED
@@ -178,29 +214,28 @@ M7-J final historical validation  NOT STARTED
 M7 certification                  WITHHELD
 ```
 
-## 9. Immediate next action
+## 10. Immediate next action
 
-Implement **M7-C Injury & Availability State** under F-10.
+Implement **M7-D Player State V1** under F-7.
 
-Required M7-C architecture:
+Required M7-D architecture:
 
-- append-only canonical injury/practice/game-status observation stream;
-- practice status and game designation remain separate;
-- official active/inactive confirmation is separate from game designation;
-- multiple simultaneous injury episodes are supported;
-- episode interpretation preserves explicit unknowns and never invents diagnoses;
-- availability, participation conditional on active, and effectiveness conditional on participation remain separate quantities;
-- confirmed inactive collapses `P(active)` to 0 in a new snapshot;
-- confirmed active does not imply full workload or full effectiveness;
-- exact PIT-safe observation membership is carried into the generic state ledger;
-- post-cutoff observations cannot alter an earlier snapshot;
-- V1 probability constants live in explicit versioned estimator configuration;
-- later information creates a new immutable injury-availability snapshot;
-- M7-C must prepare deterministic downstream propagation into M7-D rather than implementing Player State early.
+- player state is temporal and PIT-safe;
+- persistent talent is separated from current/team-conditioned state;
+- generic state dimensions include talent, current performance/form, role/usage, health/availability, workload/fatigue, and uncertainty;
+- position is explicit and position-specific extensions are supported without forcing all positions into one universal scalar rating;
+- F-10 injury/availability state is an explicit sealed parent dependency rather than duplicated health logic;
+- availability and effectiveness remain separate inside Player State;
+- role/usage changes do not masquerade as talent changes;
+- team changes may preserve talent while reinitializing team-conditioned role/context;
+- low-sample/rookie state remains high-uncertainty rather than being filled with false certainty;
+- exact historical player evidence is PIT-safe and excludes the current pregame target game;
+- V1 state transitions/weights are explicit and versioned rather than hidden constants;
+- immutable Player State snapshots use the generic M7 state ledger and become explicit parents of M7-E Unit State.
 
-Because schema v8 has been applied and certified, M7-C family-specific persistence will use forward-only migration v9 rather than rewriting v8.
+M7-E must not begin until M7-D semantics and local evidence are closed.
 
-## 10. Update rule
+## 11. Update rule
 
 Update this file whenever:
 
