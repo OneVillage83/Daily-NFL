@@ -239,7 +239,8 @@ def _configuration_from_row(row: sqlite3.Row) -> UnitConfigurationObservation:
     )
     if observation.distribution_sha256 != str(row["distribution_sha256"]):
         raise UnitStateEvidenceConflictError(
-            f"stored unit configuration {observation.observation_id!s} has invalid distribution hash"
+            "stored unit configuration "
+            f"{observation.observation_id!s} has invalid distribution hash"
         )
     if observation.payload_sha256 != str(row["payload_sha256"]):
         raise UnitStateEvidenceConflictError(
@@ -524,8 +525,8 @@ def build_unit_state_as_of(
 ) -> StateSnapshotEnvelope[UnitStatePayload]:
     """Reconstruct, persist, and seal one F-8 Unit State at a PIT cutoff."""
 
-    for snapshot in player_snapshots:
-        require_state_snapshot_sealed(connection, snapshot.snapshot_id)
+    for player_snapshot in player_snapshots:
+        require_state_snapshot_sealed(connection, player_snapshot.snapshot_id)
     configuration_observations = unit_configuration_observations_as_of(
         connection,
         team_season_id=team_season_id,
@@ -540,7 +541,7 @@ def build_unit_state_as_of(
         unit_type=unit_type,
         as_of=as_of,
     )
-    snapshot = build_unit_state_snapshot(
+    unit_snapshot = build_unit_state_snapshot(
         team_season_id=team_season_id,
         game_id=game_id,
         unit_type=unit_type,
@@ -551,5 +552,5 @@ def build_unit_state_as_of(
         config=config,
         created_at=created_at,
     )
-    record_state_snapshot(connection, snapshot)
-    return snapshot
+    record_state_snapshot(connection, unit_snapshot)
+    return unit_snapshot
