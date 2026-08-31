@@ -5,7 +5,7 @@
 **Branch:** `checkpoint/m7-state-engine-v1`
 **Certified base:** `0dd515ec36f370ce70f67b3e771e1ceb4e36a149`
 **Architecture:** F-6, F-7, F-8, F-9, F-10
-**Status:** IN PROGRESS — M7-A CLOSED / M7-B STARTING
+**Status:** IN PROGRESS — M7-B CLOSED / M7-C STARTING
 
 This file is the authoritative resume point while M7 is open. Final certification status remains governed by `ARCHITECTURE_CERTIFICATION_LOG.md`.
 
@@ -18,6 +18,7 @@ This file is the authoritative resume point while M7 is open. Final certificatio
 - `docs/implementation/M7_PREIMPLEMENTATION_CONFORMANCE_AUDIT.md`
 - `docs/implementation/M7_GATE0_BASELINE_20260827.md`
 - `docs/implementation/M7_A_COMMON_STATE_CONTRACTS_RESULT.md`
+- `docs/implementation/M7_B_STATE_PERSISTENCE_RESULT.md`
 
 ## 2. Locked scope
 
@@ -41,7 +42,8 @@ M7 begins from M6C-certified `main`:
 main SHA: 0dd515ec36f370ce70f67b3e771e1ceb4e36a149
 M6C: ARCHITECTURE-CERTIFIED
 historical PBP compatibility: 1999-2025, 27/27 PASS
-schema version before M7-B: 7
+schema before M7-B: 7
+schema after M7-B: 8
 ```
 
 Reusable foundations:
@@ -51,19 +53,11 @@ Reusable foundations:
 - M4 reconciliation boundary;
 - M5 PIT cutoff/input/snapshot machinery;
 - M6 canonical play/participation/drive evidence;
-- M6C full-history compatibility proof.
+- M6C full-history compatibility proof;
+- M7-A state contracts/uncertainty substrate;
+- M7-B immutable state persistence ledger.
 
 ## 4. Completed M7-A substrate
-
-M7-A introduced:
-
-- opaque canonical state identifiers;
-- state type / subject type vocabulary;
-- immutable generic state-snapshot envelope;
-- exact expected/present/missing coverage;
-- structured uncertainty contracts for probabilities, numeric moments, bounded intervals, categorical mixtures, and explicit unknown quantities;
-- exact observation/dependency membership validation;
-- focused failure-state tests.
 
 Validated M7-A head:
 
@@ -82,22 +76,59 @@ git diff --check: PASS
 working tree: clean
 ```
 
-## 5. Build sequence
+M7-A introduced opaque canonical state identifiers, state/subject vocabularies, immutable state envelopes, exact coverage, and structured uncertainty contracts.
+
+## 5. Completed M7-B persistence substrate
+
+Validated M7-B head:
 
 ```text
-M7-A  Common state contracts / IDs / uncertainty           CLOSED / PASS
-M7-B  Migration v8 + state snapshot/input/dependency ledger IN PROGRESS
-M7-C  Injury observation / episode / availability           NOT STARTED
-M7-D  Player State V1                                       NOT STARTED
-M7-E  Unit State V1                                         NOT STARTED
-M7-F  Coaching & Scheme State V1                            NOT STARTED
-M7-G  Team State V1                                         NOT STARTED
-M7-H  Dependency propagation / rebuild inspection           NOT STARTED
-M7-I  PIT multi-snapshot validation                         NOT STARTED
-M7-J  Historical/real-data validation + certification       NOT STARTED
+45e4b2f84e39b38c5a2917c7e882c7a9abba6382
 ```
 
-## 6. Gate 0 evidence
+M7-B local gate:
+
+```text
+focused pytest: 40 passed
+Ruff: PASS
+strict mypy: PASS — 104 source files
+full pytest: PASS — 229 tests
+git diff --check: PASS
+working tree: clean
+local/remote branch SHA: exact match
+```
+
+Database proof:
+
+```text
+certified Gate-0 DB: 7 -> 8, check 8 -> 8
+fresh DB: 0 -> 8, check 8 -> 8
+foreign_keys_enabled: true
+integrity_ok: true
+```
+
+M7-B introduced deterministic content-addressed state snapshots, exact M5-compatible observation provenance, explicit state dependencies, atomic seals, append-only guards, cycle rejection, and idempotent replay.
+
+The initial cycle test failure was a test-expectation defect: the dedicated cycle guard correctly fired before the generic post-seal membership guard. The test was corrected without weakening production semantics.
+
+Migration v8 is now immutable applied history. Later M7 family-specific persistence must use new forward-only migrations rather than editing v8.
+
+## 6. Build sequence
+
+```text
+M7-A  Common state contracts / IDs / uncertainty            CLOSED / PASS
+M7-B  Migration v8 + state snapshot/input/dependency ledger CLOSED / PASS
+M7-C  Injury observation / episode / availability            IN PROGRESS
+M7-D  Player State V1                                        NOT STARTED
+M7-E  Unit State V1                                          NOT STARTED
+M7-F  Coaching & Scheme State V1                             NOT STARTED
+M7-G  Team State V1                                          NOT STARTED
+M7-H  Dependency propagation / rebuild inspection            NOT STARTED
+M7-I  PIT multi-snapshot validation                          NOT STARTED
+M7-J  Historical/real-data validation + certification        NOT STARTED
+```
+
+## 7. Gate 0 evidence
 
 Exact tested documentation head:
 
@@ -128,15 +159,15 @@ integrity_ok: true
 
 Gate 0 is formally **CLOSED / PASS**.
 
-## 7. Gate state
+## 8. Gate state
 
 ```text
 M7 contract                       LOCKED
 Pre-implementation audit          COMPLETE
 Gate 0 local/static baseline      CLOSED / PASS
 M7-A common contracts             CLOSED / PASS
-M7-B migration/persistence        IN PROGRESS
-M7-C injury/availability          NOT STARTED
+M7-B migration/persistence        CLOSED / PASS
+M7-C injury/availability          IN PROGRESS
 M7-D player state                 NOT STARTED
 M7-E unit state                   NOT STARTED
 M7-F coaching/scheme              NOT STARTED
@@ -147,28 +178,29 @@ M7-J final historical validation  NOT STARTED
 M7 certification                  WITHHELD
 ```
 
-## 8. Immediate next action
+## 9. Immediate next action
 
-Implement **M7-B Migration v8 + immutable state ledger**.
+Implement **M7-C Injury & Availability State** under F-10.
 
-Required M7-B proof:
+Required M7-C architecture:
 
-- migrations 1-7 remain unchanged;
-- forward-only migration v8 applies from fresh DB and certified v7;
-- `state_snapshots`, `state_snapshot_inputs`, `state_snapshot_dependencies`, and `state_snapshot_seals` are created;
-- snapshot identity is deterministic from semantic state content, exact observation inputs, and exact parent-state dependencies;
-- payload hashing and canonical serialization are deterministic;
-- identical replay is idempotent;
-- conflicting identity/payload fails closed;
-- parent snapshots must be sealed and cannot be later than the child `as_of`;
-- cycle/self-dependency attempts fail closed;
-- observation inputs cannot be later than snapshot `as_of`;
-- sealed snapshot membership cannot be extended or mutated;
-- all ledger components are append-only.
+- append-only canonical injury/practice/game-status observation stream;
+- practice status and game designation remain separate;
+- official active/inactive confirmation is separate from game designation;
+- multiple simultaneous injury episodes are supported;
+- episode interpretation preserves explicit unknowns and never invents diagnoses;
+- availability, participation conditional on active, and effectiveness conditional on participation remain separate quantities;
+- confirmed inactive collapses `P(active)` to 0 in a new snapshot;
+- confirmed active does not imply full workload or full effectiveness;
+- exact PIT-safe observation membership is carried into the generic state ledger;
+- post-cutoff observations cannot alter an earlier snapshot;
+- V1 probability constants live in explicit versioned estimator configuration;
+- later information creates a new immutable injury-availability snapshot;
+- M7-C must prepare deterministic downstream propagation into M7-D rather than implementing Player State early.
 
-M7-C must not begin until M7-B persistence semantics and schema v8 are locally validated.
+Because schema v8 has been applied and certified, M7-C family-specific persistence will use forward-only migration v9 rather than rewriting v8.
 
-## 9. Update rule
+## 10. Update rule
 
 Update this file whenever:
 
