@@ -352,8 +352,8 @@ def _early_exit_probability(status: GameDesignation, config: InjuryEstimatorConf
 
 
 def _coverage(
-    observations: tuple[InjuryObservation, ...],
-    episodes: tuple[InjuryEpisodeRevision, ...],
+    status_observations: tuple[InjuryObservation, ...],
+    active_episodes: tuple[InjuryEpisodeRevision, ...],
     practice: PracticeStatus,
     game_status: GameDesignation,
     active_status: ActiveStatus,
@@ -374,13 +374,13 @@ def _coverage(
         "effectiveness_distribution",
         "early_exit_uncertainty",
     }
-    if episodes:
+    if active_episodes:
         present.add("injury_episodes")
-    if observations and practice is not PracticeStatus.UNKNOWN:
+    if status_observations and practice is not PracticeStatus.UNKNOWN:
         present.add("practice_status")
-    if observations and game_status is not GameDesignation.UNKNOWN:
+    if status_observations and game_status is not GameDesignation.UNKNOWN:
         present.add("game_status")
-    if observations and active_status is not ActiveStatus.UNKNOWN:
+    if status_observations and active_status is not ActiveStatus.UNKNOWN:
         present.add("active_status")
     present_fields = tuple(field for field in expected if field in present)
     missing_fields = tuple(field for field in expected if field not in present)
@@ -412,8 +412,6 @@ def build_injury_availability_snapshot(
             raise ValueError("injury observation player does not match snapshot player")
         if observation.team_season_id != team_season_id:
             raise ValueError("injury observation team does not match snapshot team")
-        if observation.game_id is not None and observation.game_id != game_id:
-            raise ValueError("injury observation game does not match snapshot game")
         if observation.knowledge.available_at > as_of:
             raise ValueError("injury observation cannot be available after snapshot as_of")
 
@@ -425,18 +423,23 @@ def build_injury_availability_snapshot(
         if not set(episode.observation_ids).issubset(observation_ids):
             raise ValueError("injury episode observations must be included in snapshot inputs")
 
+    status_observations = tuple(
+        observation
+        for observation in observations
+        if observation.game_id is None or observation.game_id == game_id
+    )
     practice = _latest_status(
-        observations,
+        status_observations,
         lambda observation: observation.practice_status,
         PracticeStatus.UNKNOWN,
     )
     game_status = _latest_status(
-        observations,
+        status_observations,
         lambda observation: observation.game_status,
         GameDesignation.UNKNOWN,
     )
     active_status = _latest_status(
-        observations,
+        status_observations,
         lambda observation: observation.active_status,
         ActiveStatus.UNKNOWN,
     )
@@ -464,9 +467,14 @@ def build_injury_availability_snapshot(
     early_exit = Probability(_early_exit_probability(game_status, config))
     availability = Probability(active_probability)
 
+    active_episodes = tuple(
+        episode
+        for episode in episode_revisions
+        if episode.resolution_state is not InjuryResolutionState.RESOLVED
+    )
     episode_ids = tuple(
         sorted(
-            {episode.injury_episode_id for episode in episode_revisions},
+            {episode.injury_episode_id for episode in active_episodes},
             key=str,
         )
     )
@@ -514,7 +522,13 @@ def build_injury_availability_snapshot(
         model_version=config.version,
         state_payload=payload,
         uncertainty=uncertainty,
-        coverage=_coverage(observations, episode_revisions, practice, game_status, active_status),
+        coverage=_coverage(
+            status_observations,
+            active_episodes,
+            practice,
+            game_status,
+            active_status,
+        ),
         input_observations=tuple(observation.to_pit_input_ref() for observation in observations),
         created_at=created_at,
     )
