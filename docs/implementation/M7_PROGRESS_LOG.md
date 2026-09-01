@@ -5,7 +5,7 @@
 **Branch:** `checkpoint/m7-state-engine-v1`
 **Certified base:** `0dd515ec36f370ce70f67b3e771e1ceb4e36a149`
 **Architecture:** F-6, F-7, F-8, F-9, F-10
-**Status:** IN PROGRESS — M7-D CLOSED / M7-E STARTING
+**Status:** IN PROGRESS — M7-D CLOSED / M7-E FULL-SUITE VALIDATION NEXT
 
 This file is the authoritative resume point while M7 is open. Final certification status remains governed by `ARCHITECTURE_CERTIFICATION_LOG.md`.
 
@@ -147,29 +147,77 @@ foreign_keys_enabled: true
 integrity_ok: true
 ```
 
-M7-D introduced:
+M7-D introduced separate talent/form/role/workload/health/position-specific dimensions, append-only versioned PIT player evidence, prior-team talent persistence with current-team role isolation, exact F-10 parent lineage, low-sample uncertainty, and deterministic order-stable construction.
 
-- separate talent, form/performance, role/usage, workload, health/availability, and position-specific dimensions;
-- explicit position families instead of one universal player scalar;
-- append-only versioned PIT player evidence with semantic hashing;
-- prior-team talent persistence with current-team role/form/workload isolation;
-- target-game evidence exclusion;
-- explicit sealed F-10 injury-state parent dependency;
-- availability/participation/effectiveness separation;
-- low-sample uncertainty;
-- no assumed fatigue penalty from workload alone;
-- deterministic order-stable state construction.
+Migration v10 is immutable applied history.
 
-Migration v10 is now immutable applied history.
+## 5. M7-E — F-8 Unit State V1 validation state
 
-## 5. Build sequence
+First executable candidate:
+
+```text
+64215b1057f41deb37d5899f695f76f3d31ce390
+```
+
+First local focused/static gate:
+
+```text
+focused F-8 pytest: 22 passed
+Ruff: 1 E501 in unit_repository.py
+focused mypy: 22 errors
+```
+
+Classification:
+
+- Unit State behavioral semantics: PASS;
+- migration v11: NOT APPLIED;
+- blockers were static typing/hygiene only;
+- no F-8 architecture or estimator behavior was weakened.
+
+Static remediation removed Player/Unit snapshot variable shadowing, preserved an exact `StateSnapshotEnvelope[UnitStatePayload]` repository return type, corrected the Ruff line, tightened test generics, removed loose `dict[str, object]` kwargs typing, and future-proofed the historical M7-D v9 -> v10 migration boundary tests.
+
+Repeated focused/static candidate:
+
+```text
+ceaa74138474ec91306569fb4280b4c34640ddc9
+```
+
+Repeated local gate:
+
+```text
+M7-D + M7-E focused pytest: 43 passed
+affected-surface Ruff: PASS
+affected-surface strict mypy: PASS — 4 source files
+git diff --check: PASS
+working tree: clean
+local/remote branch SHA: exact match
+```
+
+M7-E architecture currently includes:
+
+- forward-only migration v11; v8-v10 remain immutable applied history;
+- provider-neutral offensive, defensive, and special-teams functional unit types;
+- health-neutral `ROLE_PRIOR_ONLY` probabilistic configuration observations;
+- Player State availability applied exactly once to convert role priors into pregame posterior configuration probabilities;
+- exact sealed Player State parent dependencies without reopening player raw evidence;
+- direct continuity/experience/role-compatibility/synergy/recent-performance unit evidence;
+- residualization requirement for role compatibility, synergy, and recent unit performance to prevent Player State double counting;
+- separate intrinsic player quality, member form, residual unit performance, continuity, experience, compatibility, synergy, health, and scheme-fit dimensions;
+- scheme fit remains explicitly unknown until M7-F supplies a coaching/scheme parent;
+- target-game direct unit evidence exclusion;
+- conflicting configuration sources fail closed;
+- late inactive Player State can eliminate invalid configurations and shift probability to valid replacements in a later immutable Unit State.
+
+Migration v11 remains unapplied. The next required gate is full-repository Ruff, mypy, and pytest compatibility on the post-remediation branch head.
+
+## 6. Build sequence
 
 ```text
 M7-A  Common state contracts / IDs / uncertainty             CLOSED / PASS
 M7-B  Migration v8 + state snapshot/input/dependency ledger  CLOSED / PASS
 M7-C  Injury observation / episode / availability             CLOSED / PASS
 M7-D  Player State V1                                         CLOSED / PASS
-M7-E  Unit State V1                                           STARTING
+M7-E  Unit State V1                                           FULL-SUITE VALIDATION NEXT
 M7-F  Coaching & Scheme State V1                              NOT STARTED
 M7-G  Team State V1                                           NOT STARTED
 M7-H  Dependency propagation / rebuild inspection             NOT STARTED
@@ -177,7 +225,7 @@ M7-I  PIT multi-snapshot validation                           NOT STARTED
 M7-J  Historical/real-data validation + certification         NOT STARTED
 ```
 
-## 6. Gate 0 evidence
+## 7. Gate 0 evidence
 
 Exact tested documentation head:
 
@@ -201,7 +249,7 @@ integrity_ok: true
 
 Gate 0 is formally CLOSED / PASS.
 
-## 7. Gate state
+## 8. Gate state
 
 ```text
 M7 contract                       LOCKED
@@ -211,7 +259,7 @@ M7-A common contracts             CLOSED / PASS
 M7-B migration/persistence        CLOSED / PASS
 M7-C injury/availability          CLOSED / PASS
 M7-D player state                 CLOSED / PASS
-M7-E unit state                   STARTING
+M7-E unit state                   FULL-SUITE VALIDATION NEXT
 M7-F coaching/scheme              NOT STARTED
 M7-G team state                   NOT STARTED
 M7-H dependency propagation       NOT STARTED
@@ -220,29 +268,23 @@ M7-J final historical validation  NOT STARTED
 M7 certification                  WITHHELD
 ```
 
-## 8. Immediate next action
+## 9. Immediate next action
 
-Implement **M7-E Unit State V1** under F-8.
+Run the complete repository quality gate on the current M7-E post-remediation branch head:
 
-Required M7-E architecture:
+```powershell
+python -m ruff check .
+python -m mypy .
+python -m pytest -q
+```
 
-- unit state is temporal and PIT-safe;
-- functional unit types remain explicit rather than collapsing the roster into one team aggregate;
-- expected pregame membership is probabilistic until late availability resolves;
-- Player State snapshots are exact sealed parent dependencies;
-- the preferred dependency remains `PLAYER STATE -> UNIT STATE -> TEAM STATE`;
-- Unit State must not independently re-ingest player raw evidence and thereby double count player information;
-- member composition, expected participation, intrinsic quality, continuity, experience together, role compatibility, synergy, scheme fit, recent performance, health, and uncertainty remain distinct concepts;
-- V1 may leave continuity/synergy/scheme-fit dimensions explicitly unknown when no PIT-safe evidence exists; it must not fabricate them;
-- unit-specific families include offensive line, receiving, backfield, pass protection/run blocking, defensive front/pass rush/run defense, linebackers/coverage/secondary, and special-teams units;
-- unit configuration identity is provider-neutral and must not use provider roster IDs as canonical identity;
-- late player availability changes create later Unit State snapshots rather than mutating earlier states;
-- immutable Unit State snapshots use the generic M7 state ledger and become explicit parents of M7-G Team State;
-- because schema v10 is now applied history, any M7-E persistence additions must use forward-only migration v11.
+Then prove a clean working tree and exact local/remote branch alignment.
+
+Do not apply migration v11 until that full gate is green. If the full gate passes, the next step is the real schema 10 -> 11 upgrade on an existing M7-D schema-v10 database plus a fresh 0 -> 11 proof. Only after those database proofs may migration v11 become immutable applied history and M7-E be considered for closure.
 
 M7-F and M7-G must not be implemented early merely to fill missing unit scheme/team dimensions. Missing state is preferable to fabricated state.
 
-## 9. Update rule
+## 10. Update rule
 
 Update this file whenever:
 
