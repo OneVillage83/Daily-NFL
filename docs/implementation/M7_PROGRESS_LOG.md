@@ -5,7 +5,7 @@
 **Branch:** `checkpoint/m7-state-engine-v1`
 **Certified base:** `0dd515ec36f370ce70f67b3e771e1ceb4e36a149`
 **Architecture:** F-6, F-7, F-8, F-9, F-10
-**Status:** IN PROGRESS — M7-E CLOSED / M7-F STARTING
+**Status:** IN PROGRESS — M7-E CLOSED / M7-F PREVALIDATION CANDIDATE
 
 This file is the authoritative resume point while M7 is open. Final certification status remains governed by `ARCHITECTURE_CERTIFICATION_LOG.md`.
 
@@ -25,8 +25,6 @@ This file is the authoritative resume point while M7 is open. Final certificatio
 
 ## 2. Locked scope
 
-M7 owns:
-
 ```text
 F-6  Team State
 F-7  Player State
@@ -39,44 +37,24 @@ M7 does not own F-11/F-12 environment/recovery integration, M9 feature registry,
 
 ## 3. Certified foundation
 
-M7 begins from M6C-certified `main`:
-
 ```text
-main SHA: 0dd515ec36f370ce70f67b3e771e1ceb4e36a149
-M6C: ARCHITECTURE-CERTIFIED
-historical PBP compatibility: 1999-2025, 27/27 PASS
-schema before M7-B: 7
+M6C certified main: 0dd515ec36f370ce70f67b3e771e1ceb4e36a149
+M6C historical PBP compatibility: 1999-2025, 27/27 PASS
+schema entering M7: 7
 schema after M7-B: 8
 schema after M7-C: 9
 schema after M7-D: 10
 schema after M7-E: 11
 ```
 
-Reusable foundations:
+Reusable foundations include provider-neutral identity, immutable raw evidence/provenance, PIT snapshot/input machinery, canonical football history, common state contracts, the immutable state ledger, F-10 Injury State, F-7 Player State, and F-8 Unit State.
 
-- provider-neutral identity/domain contracts;
-- immutable raw evidence/provenance;
-- M4 reconciliation boundary;
-- M5 PIT cutoff/input/snapshot machinery;
-- M6 canonical play/participation/drive evidence;
-- M6C full-history compatibility proof;
-- M7-A state contracts/uncertainty substrate;
-- M7-B immutable state persistence ledger;
-- M7-C injury/availability state and PIT episode history;
-- M7-D Player State with explicit F-10 parent lineage;
-- M7-E Unit State with explicit sealed Player State lineage and residualized direct unit evidence.
-
-## 4. Completed checkpoints
+## 4. Closed checkpoints
 
 ### M7-A — Common state substrate
 
-Validated head:
-
 ```text
-9de3b61b738f934061918342d22ee29923cdb43b
-```
-
-```text
+validated head: 9de3b61b738f934061918342d22ee29923cdb43b
 focused pytest: 26 passed
 Ruff: PASS
 strict mypy: PASS — 100 source files
@@ -85,13 +63,8 @@ full pytest: 215 passed
 
 ### M7-B — Immutable state ledger
 
-Validated head:
-
 ```text
-45e4b2f84e39b38c5a2917c7e882c7a9abba6382
-```
-
-```text
+validated head: 45e4b2f84e39b38c5a2917c7e882c7a9abba6382
 focused pytest: 40 passed
 Ruff: PASS
 strict mypy: PASS — 104 source files
@@ -104,13 +77,8 @@ Migration v8 is immutable applied history.
 
 ### M7-C — F-10 Injury & Availability State
 
-Validated head:
-
 ```text
-a9e1284073ee9c7a8a48bccf12bac9b900c88fa6
-```
-
-```text
+validated head: a9e1284073ee9c7a8a48bccf12bac9b900c88fa6
 focused pytest: 16 passed
 Ruff: PASS
 strict mypy: PASS — 108 source files
@@ -123,87 +91,42 @@ Migration v9 is immutable applied history.
 
 ### M7-D — F-7 Player State V1
 
-Validated head:
-
 ```text
-c117380cd591ddc89101f5a62a5c90847aeb4384
-```
-
-```text
+validated head: c117380cd591ddc89101f5a62a5c90847aeb4384
 focused pytest: 21 passed
 Ruff: PASS
 strict mypy: PASS — 112 source files
 full pytest: 266 passed
 real DB: 9 -> 10, check 10 -> 10
 fresh DB: 0 -> 10, check 10 -> 10
-git diff --check: PASS
-working tree: clean
-local/remote branch SHA: exact match
 ```
 
 Migration v10 is immutable applied history.
 
 ### M7-E — F-8 Unit State V1
 
-First executable candidate:
+First candidate `64215b1057f41deb37d5899f695f76f3d31ce390` passed 22 behavioral tests but exposed one Ruff line and 22 static typing errors. Those were classified as static implementation/test-hygiene defects only; no F-8 semantic gate was weakened.
 
-```text
-64215b1057f41deb37d5899f695f76f3d31ce390
-```
-
-First local focused/static gate:
-
-```text
-focused F-8 pytest: 22 passed
-Ruff: 1 E501 in unit_repository.py
-focused mypy: 22 errors
-schema v11: NOT YET APPLIED
-```
-
-Classification: behavioral semantics PASS; blockers were static typing/hygiene and historical-test maintenance only. No F-8 architecture or estimator behavior was weakened.
-
-Repeated focused/static candidate:
-
-```text
-ceaa74138474ec91306569fb4280b4c34640ddc9
-```
+Repeated candidate `ceaa74138474ec91306569fb4280b4c34640ddc9`:
 
 ```text
 M7-D + M7-E focused pytest: 43 passed
 affected-surface Ruff: PASS
 affected-surface strict mypy: PASS — 4 source files
-git diff --check: PASS
-working tree: clean
-local/remote branch SHA: exact match
 ```
 
-Final validated executable/documentation head:
+Final validated head:
 
 ```text
 15be474abd3a0ac476bce9e770cf1bcc25d367fc
-```
-
-Final repository gate:
-
-```text
 Ruff: PASS
 strict mypy: PASS — 116 source files
 full pytest: 288 passed
-git diff --check: PASS
-working tree: clean
-local/remote branch SHA: exact match
-```
-
-Database proof:
-
-```text
-real M7-D DB: 10 -> 11, check 11 -> 11
+real DB: 10 -> 11, check 11 -> 11
 fresh DB: 0 -> 11, check 11 -> 11
 foreign_keys_enabled: true
 integrity_ok: true
 ```
-
-M7-E closed the F-8 substrate with health-neutral probabilistic role priors, Player State availability applied exactly once, exact sealed Player State parent dependencies, no raw-player re-ingestion, residualized direct unit evidence, explicit configuration uncertainty, explicit missing scheme fit, and immutable late-replacement propagation.
 
 Migration v11 is immutable applied history.
 
@@ -215,25 +138,23 @@ M7-B  Migration v8 + state snapshot/input/dependency ledger  CLOSED / PASS
 M7-C  Injury observation / episode / availability             CLOSED / PASS
 M7-D  Player State V1                                         CLOSED / PASS
 M7-E  Unit State V1                                           CLOSED / PASS
-M7-F  Coaching & Scheme State V1                              STARTING
+M7-F  Coaching & Scheme State V1                              PREVALIDATION CANDIDATE
 M7-G  Team State V1                                           NOT STARTED
 M7-H  Dependency propagation / rebuild inspection             NOT STARTED
 M7-I  PIT multi-snapshot validation                           NOT STARTED
 M7-J  Historical/real-data validation + certification         NOT STARTED
 ```
 
-## 6. M7-F — F-9 Coaching & Scheme State V1 locked implementation boundary
+## 6. M7-F — F-9 Coaching & Scheme State V1
 
-M7-F must implement the locked F-9 architecture without collapsing personnel identity, scheme tendency, and coaching quality into one rating.
-
-Required distinctions:
+### Locked architecture
 
 ```text
 PERSON
   ↓
 COACHING_STINT
   ↓
-ROLE
+ROLE / RESPONSIBILITY
   ↓
 COACHING_REGIME
 ```
@@ -246,52 +167,58 @@ PUBLIC_SCHEME_LABEL
 != COACHING_EFFECTIVENESS
 ```
 
-M7-F V1 must preserve:
+M7-F preserves:
 
-- temporal coaching roles/stints and regime versions;
-- explicit head coach, offensive play caller, defensive play caller, and coordinator responsibility where known;
-- new regime/version when responsibility or play-caller identity changes midseason;
-- public scheme labels as descriptive evidence only, never analytical truth;
-- offensive and defensive tendency dimensions inferred from PIT-safe behavior;
-- game-state-conditioned tendencies rather than unconditional run/pass/blitz rates;
-- base scheme separated from game-specific/opponent-specific deviation;
+- persistent Person identity separate from team-scoped CoachingStint identity;
+- time-versioned role and responsibility observations;
+- explicit head coach, coordinators, offensive play caller, and defensive play caller when known;
+- deterministic new regime identity when staff/responsibility semantics change;
+- unresolved play-caller responsibility as explicit unknown state;
+- public scheme labels as descriptive evidence only;
+- empirical offensive/defensive/special-teams/decision-policy evidence as a separate analytical layer;
+- game-state-conditioned policy buckets rather than unconditional run/pass/blitz rates;
+- base scheme separated from target-game-specific deviation;
 - scheme/strategy separated from coaching effectiveness;
-- current target-game evidence excluded from pregame state;
-- explicit uncertainty and missing dimensions rather than fabricated scheme values;
-- immutable Coaching State snapshots through the generic M7 state ledger;
-- deterministic, versioned content identity and idempotent replay;
-- exact observation lineage;
-- forward-only migration v12 for any new coaching/scheme persistence because v11 is now immutable applied history.
+- current target-game behavioral evidence excluded from pregame state;
+- exact PIT observation membership in the generic immutable state ledger;
+- versioned/recalibratable V1 estimator constants;
+- forward-only migration v12 because v11 is applied history.
 
-V1 may use explicit deterministic estimators/priors where scientifically honest, but all constants and contracts must be versioned and recalibratable. Hierarchical priors and structural change-point detection remain extension points unless supported by present PIT evidence.
+### Prevalidation implementation
 
-M7-F should not fabricate historical coach identity or play-caller assignments merely to populate a state. Unknown responsibility remains unknown.
+The branch now contains:
 
-## 7. Gate 0 evidence
+- additive `CoachingStintId` / `CoachingStint` canonical identity;
+- additive coaching assignment/scheme/public-label observation IDs;
+- migration v12 `m7_coaching_scheme_state_evidence_foundation`;
+- `coaching_stints` canonical identity table;
+- append-only `coaching_assignment_observations`;
+- append-only `coaching_scheme_evidence_observations`;
+- append-only `public_scheme_label_observations`;
+- raw-provenance checks and semantic hashes;
+- exact persistence of assignment knowledge `effective_at` separately from role interval `effective_from/effective_to`;
+- DDL and Python parity limiting game-specific deviation to scheme/policy components;
+- conditioned empirical tendency estimates retained as separate game-state buckets;
+- provider-neutral semantic Coaching State payloads;
+- public-label observations projected to semantic `(side, label)` payloads instead of carrying provider/provenance data into state;
+- semantic coaching-regime identity independent of source/logical keys;
+- future-effective higher assignment revisions that do not prematurely hide the current active assignment;
+- repository reconstruction plus immutable Coaching State sealing;
+- focused negative/regression tests for assignment revisions, future announcements, play-caller transitions, duplicate responsibilities, unconditional tendency misuse, target-game leakage, post-cutoff evidence, base/deviation separation, public-label separation, and immutable replay.
 
-Exact tested documentation head:
+Migration v12 is **NOT APPLIED** and remains editable until focused/static and then full-repository validation pass.
 
-```text
-fa22e63db79f49d9072f318df18cc38d20d30434
-```
+### Prevalidation hardening decisions
 
-```text
-Python 3.12.10
-E:\Daily-NFL\.venv\Scripts\python.exe
-Ruff: PASS
-strict mypy: PASS — 95 source files
-full pytest: 189 passed
-git diff --check: PASS
-working tree: clean
-fresh database: 0 -> 7
-check: 7 -> 7
-foreign_keys_enabled: true
-integrity_ok: true
-```
+1. **Conditioning is preserved, not averaged away.** Policy evidence is aggregated within exact game-state condition buckets to remain compatible with the long-term `π(a | s)` direction.
+2. **Regime identity is semantic.** Observation IDs, provider metadata, and logical/source keys do not define a coaching regime.
+3. **Public labels are not analytical truth.** Labels remain exact PIT inputs but the state payload contains only provider-neutral descriptive labels; they do not populate empirical scheme estimates.
+4. **Future announcements do not rewrite current state.** A known future-effective assignment revision cannot suppress the currently effective assignment before its effective time.
+5. **Ended latest revisions do not resurrect older history.** Fallback is restricted to the future-effective-revision case.
+6. **Assignment clocks stay distinct.** Knowledge `effective_at` is persisted independently from the assignment's semantic effective interval.
+7. **Same person/team relationship can support multiple roles/responsibilities under one CoachingStint identity.**
 
-Gate 0 is formally CLOSED / PASS.
-
-## 8. Gate state
+## 7. Gate state
 
 ```text
 M7 contract                       LOCKED
@@ -302,37 +229,23 @@ M7-B migration/persistence        CLOSED / PASS
 M7-C injury/availability          CLOSED / PASS
 M7-D player state                 CLOSED / PASS
 M7-E unit state                   CLOSED / PASS
-M7-F coaching/scheme              STARTING
-M7-G team state                   NOT STARTED
+M7-F coaching/scheme              PREVALIDATION CANDIDATE
+migration v12                     NOT APPLIED / NOT FROZEN
+M7-G team state                   LOCKED
 M7-H dependency propagation       NOT STARTED
 M7-I PIT propagation validation   NOT STARTED
 M7-J final historical validation  NOT STARTED
 M7 certification                  WITHHELD
 ```
 
-## 9. Immediate next action
+## 8. Immediate next action
 
-Implement **M7-F Coaching & Scheme State V1** under F-9.
+Run the first local M7-F focused/static gate on the pinned branch head. Do **not** apply migration v12 yet.
 
-First implementation slice should establish:
+If the focused/static gate is clean, advance to full-repository Ruff/mypy/pytest. Only after the full repository gate is clean may a real schema-v11 database be upgraded to v12 and a fresh 0 -> 12 initialization be used as migration proof.
 
-1. canonical coaching-role / responsibility / regime observations and identities;
-2. append-only PIT persistence through forward-only migration v12;
-3. empirical scheme/tendency evidence with explicit game-state conditioning metadata;
-4. immutable Coaching State construction that separates offensive scheme, defensive scheme, special-teams strategy, decision policy, adaptation, and coaching effectiveness;
-5. exact PIT observation lineage and deterministic replay;
-6. focused negative tests for regime changes, play-caller changes, unconditional-tendency misuse, post-cutoff evidence, target-game leakage, unknown responsibilities, and immutability.
+M7-G must remain locked until M7-F closes. Team State will consume Unit State and Coaching State rather than bypassing them.
 
-M7-G must remain locked until M7-F is locally validated. Team State should consume Unit State and Coaching State rather than bypassing them.
+## 9. Update rule
 
-## 10. Update rule
-
-Update this file whenever:
-
-- a gate changes state;
-- an architecture decision is added/changed;
-- an executable authority changes;
-- a defect is found/remediated;
-- local validation is run;
-- a new provider/data limitation is discovered;
-- the resume point moves.
+Update this file whenever a gate changes state, an architecture decision changes, executable authority changes, a defect is found/remediated, local validation is run, a provider/data limitation is discovered, or the resume point moves.
