@@ -32,6 +32,7 @@ from daily_nfl.state import (
     NamedMoments,
     NumericMoments,
     Probability,
+    PublicSchemeLabel,
     PublicSchemeLabelObservation,
     PublicSchemeSide,
     StateSubjectType,
@@ -44,6 +45,7 @@ from daily_nfl.state import (
     record_coaching_assignment_observation,
     record_coaching_scheme_evidence,
     record_public_scheme_label_observation,
+    resolve_active_coaching_assignments,
     state_snapshot_is_sealed,
 )
 
@@ -129,9 +131,14 @@ def _seed_core(connection: sqlite3.Connection) -> None:
         )
 
 
-def _knowledge(available_at: datetime) -> KnowledgeTimestamp:
+def _knowledge(
+    available_at: datetime,
+    *,
+    effective_at: datetime | None = None,
+) -> KnowledgeTimestamp:
     return KnowledgeTimestamp(
         available_at=available_at,
+        effective_at=effective_at,
         published_at=available_at,
         observed_at=available_at,
         ingested_at=available_at,
@@ -158,6 +165,10 @@ def _condition(
     )
 
 
+def _stint_id(person_id: PersonId) -> CoachingStintId:
+    return CoachingStintId(f"coach-stint-{person_id}")
+
+
 def _assignment(
     number: int,
     *,
@@ -169,13 +180,11 @@ def _assignment(
     revision: int = 1,
     effective_from: datetime | None = None,
     effective_to: datetime | None = None,
-    stint_key: str | None = None,
+    knowledge_effective_at: datetime | None = None,
 ) -> CoachingAssignmentObservation:
     return CoachingAssignmentObservation(
         observation_id=CoachingAssignmentObservationId(f"coach-assignment-{number}"),
-        coaching_stint_id=CoachingStintId(
-            f"coach-stint-{stint_key or str(person_id)}"
-        ),
+        coaching_stint_id=_stint_id(person_id),
         person_id=person_id,
         team_season_id=TEAM_ID,
         logical_key=logical_key,
@@ -187,7 +196,10 @@ def _assignment(
         assignment_contract="NFL_COACHING_ASSIGNMENT_TEST_V1",
         assignment_version="1",
         provider_id="coaching-test",
-        knowledge=_knowledge(available_at),
+        knowledge=_knowledge(
+            available_at,
+            effective_at=knowledge_effective_at,
+        ),
     )
 
 
@@ -233,7 +245,6 @@ def _base_assignments(
                     available_at=as_of - timedelta(days=60),
                     responsibilities=(CoachingResponsibility.OFFENSIVE_PLAY_CALLER,),
                     effective_from=as_of - timedelta(days=200),
-                    stint_key="oc",
                 ),
                 _assignment(
                     5,
@@ -243,7 +254,6 @@ def _base_assignments(
                     available_at=as_of - timedelta(days=60),
                     responsibilities=(CoachingResponsibility.DEFENSIVE_PLAY_CALLER,),
                     effective_from=as_of - timedelta(days=200),
-                    stint_key="dc",
                 ),
             )
         )
@@ -360,13 +370,20 @@ def test_migration_v12_upgrades_applied_v11_without_rewriting_history() -> None:
 
 def test_coaching_stint_is_distinct_from_role_assignment() -> None:
     stint = CoachingStint(
-        coaching_stint_id=CoachingStintId("stint-hc"),
+        coaching_stint_id=_stint_id(HC_ID),
         person_id=HC_ID,
         team_season_id=TEAM_ID,
         started_at=BASE - timedelta(days=200),
     )
     assert stint.person_id == HC_ID
     assert stint.team_season_id == TEAM_ID
+
+
+def test_same_person_roles_share_one_canonical_coaching_stint() -> None:
+    assignments = _base_assignments(as_of=BASE)
+    oc_rows = [item for item in assignments if item.person_id == OC_ID]
+    assert len(oc_rows) == 2
+    assert {item.coaching_stint_id for item in oc_rows} == {_stint_id(OC_ID)}
 
 
 def test_assignment_repository_is_idempotent_append_only_and_pit_selectable() -> None:
@@ -391,6 +408,31 @@ def test_assignment_repository_is_idempotent_append_only_and_pit_selectable() ->
         connection.close()
 
 
+def test_assignment_knowledge_effective_at_round_trips_exactly() -> None:
+    connection = _connection()
+    try:
+        effective_at = BASE - timedelta(days=120)
+        assignment = _assignment(
+            1,
+            person_id=HC_ID,
+            role_type=CoachingRoleType.HEAD_COACH,
+            logical_key="head-coach-effective-proof",
+            available_at=BASE - timedelta(days=60),
+            effective_from=BASE - timedelta(days=150),
+            knowledge_effective_at=effective_at,
+        )
+        record_coaching_assignment_observation(connection, assignment)
+        selected = coaching_assignments_as_of(
+            connection,
+            team_season_id=TEAM_ID,
+            as_of=BASE,
+        )
+        assert selected == (assignment,)
+        assert selected[0].knowledge.effective_at == effective_at
+    finally:
+        connection.close()
+
+
 def test_assignment_revision_selection_is_point_in_time() -> None:
     connection = _connection()
     try:
@@ -402,7 +444,6 @@ def test_assignment_revision_selection_is_point_in_time() -> None:
             revision=1,
             available_at=BASE - timedelta(days=10),
             effective_from=BASE - timedelta(days=100),
-            stint_key="oc",
         )
         correction = _assignment(
             2,
@@ -413,7 +454,6 @@ def test_assignment_revision_selection_is_point_in_time() -> None:
             available_at=BASE - timedelta(days=2),
             responsibilities=(CoachingResponsibility.OFFENSIVE_PLAY_CALLER,),
             effective_from=BASE - timedelta(days=100),
-            stint_key="oc",
         )
         record_coaching_assignment_observation(connection, first)
         record_coaching_assignment_observation(connection, correction)
@@ -433,46 +473,125 @@ def test_assignment_revision_selection_is_point_in_time() -> None:
         connection.close()
 
 
-def test_coaching_regime_identity_is_assignment_order_independent() -> None:
-    assignments = _base_assignments(as_of=BASE)
-    assert coaching_regime_id(assignments) == coaching_regime_id(
-        tuple(reversed(assignments))
+def test_future_announced_revision_does_not_hide_current_active_assignment() -> None:
+    current = _assignment(
+        1,
+        person_id=OC_ID,
+        role_type=CoachingRoleType.OTHER,
+        logical_key="offensive-play-caller-transition",
+        revision=1,
+        available_at=BASE - timedelta(days=30),
+        responsibilities=(CoachingResponsibility.OFFENSIVE_PLAY_CALLER,),
+        effective_from=BASE - timedelta(days=100),
     )
+    future = _assignment(
+        2,
+        person_id=ALT_ID,
+        role_type=CoachingRoleType.OTHER,
+        logical_key=current.logical_key,
+        revision=2,
+        available_at=BASE - timedelta(days=1),
+        responsibilities=(CoachingResponsibility.OFFENSIVE_PLAY_CALLER,),
+        effective_from=BASE + timedelta(days=1),
+    )
+    resolved_now = resolve_active_coaching_assignments(
+        (current, future),
+        team_season_id=TEAM_ID,
+        as_of=BASE,
+    )
+    resolved_later = resolve_active_coaching_assignments(
+        (current, future),
+        team_season_id=TEAM_ID,
+        as_of=BASE + timedelta(days=2),
+    )
+    assert resolved_now == (current,)
+    assert resolved_later == (future,)
+
+
+def test_future_announced_revision_round_trips_through_repository() -> None:
+    connection = _connection()
+    try:
+        current = _assignment(
+            1,
+            person_id=OC_ID,
+            role_type=CoachingRoleType.OTHER,
+            logical_key="repository-caller-transition",
+            revision=1,
+            available_at=BASE - timedelta(days=30),
+            responsibilities=(CoachingResponsibility.OFFENSIVE_PLAY_CALLER,),
+            effective_from=BASE - timedelta(days=100),
+        )
+        future = _assignment(
+            2,
+            person_id=ALT_ID,
+            role_type=CoachingRoleType.OTHER,
+            logical_key=current.logical_key,
+            revision=2,
+            available_at=BASE - timedelta(days=1),
+            responsibilities=(CoachingResponsibility.OFFENSIVE_PLAY_CALLER,),
+            effective_from=BASE + timedelta(days=1),
+        )
+        record_coaching_assignment_observation(connection, current)
+        record_coaching_assignment_observation(connection, future)
+        assert coaching_assignments_as_of(
+            connection,
+            team_season_id=TEAM_ID,
+            as_of=BASE,
+        ) == (current,)
+        assert coaching_assignments_as_of(
+            connection,
+            team_season_id=TEAM_ID,
+            as_of=BASE + timedelta(days=2),
+        ) == (future,)
+    finally:
+        connection.close()
+
+
+def test_coaching_regime_identity_is_order_and_logical_key_independent() -> None:
+    assignments = _base_assignments(as_of=BASE)
+    reversed_id = coaching_regime_id(tuple(reversed(assignments)))
+    changed_key = _assignment(
+        99,
+        person_id=HC_ID,
+        role_type=CoachingRoleType.HEAD_COACH,
+        logical_key="different-source-key",
+        available_at=BASE - timedelta(days=60),
+        effective_from=BASE - timedelta(days=200),
+    )
+    same_semantics = (changed_key, *assignments[1:])
+    assert coaching_regime_id(assignments) == reversed_id
+    assert coaching_regime_id(assignments) == coaching_regime_id(same_semantics)
 
 
 def test_play_caller_change_creates_new_regime_without_changing_head_coach() -> None:
-    early_assignments = _base_assignments(as_of=BASE)
+    base = _base_assignments(as_of=BASE)
+    old_caller = next(item for item in base if item.logical_key == "offensive-play-caller")
+    future_caller = _assignment(
+        20,
+        person_id=ALT_ID,
+        role_type=CoachingRoleType.OTHER,
+        logical_key=old_caller.logical_key,
+        revision=2,
+        available_at=CHANGE - timedelta(hours=1),
+        responsibilities=(CoachingResponsibility.OFFENSIVE_PLAY_CALLER,),
+        effective_from=CHANGE,
+    )
+    assignments = (*base, future_caller)
     early = build_coaching_state_snapshot(
         team_season_id=TEAM_ID,
         game_id=GAME_ID,
-        as_of=BASE - timedelta(days=3),
-        assignment_observations=early_assignments,
+        as_of=CHANGE - timedelta(hours=2),
+        assignment_observations=assignments,
         scheme_evidence=(),
-        created_at=BASE - timedelta(days=3) + timedelta(seconds=1),
-    )
-    late_assignments = tuple(
-        item
-        for item in early_assignments
-        if item.logical_key != "offensive-play-caller"
-    ) + (
-        _assignment(
-            20,
-            person_id=ALT_ID,
-            role_type=CoachingRoleType.OTHER,
-            logical_key="new-offensive-play-caller",
-            available_at=CHANGE,
-            responsibilities=(CoachingResponsibility.OFFENSIVE_PLAY_CALLER,),
-            effective_from=CHANGE,
-            stint_key="alt",
-        ),
+        created_at=CHANGE - timedelta(hours=2) + timedelta(seconds=1),
     )
     late = build_coaching_state_snapshot(
         team_season_id=TEAM_ID,
         game_id=GAME_ID,
-        as_of=BASE - timedelta(days=1),
-        assignment_observations=late_assignments,
+        as_of=CHANGE + timedelta(hours=1),
+        assignment_observations=assignments,
         scheme_evidence=(),
-        created_at=BASE - timedelta(days=1) + timedelta(seconds=1),
+        created_at=CHANGE + timedelta(hours=1, seconds=1),
     )
     assert early.state_payload.head_coach_id == late.state_payload.head_coach_id == HC_ID
     assert early.state_payload.offensive_play_caller_id == OC_ID
@@ -506,7 +625,6 @@ def test_multiple_active_head_coaches_fail_closed() -> None:
             logical_key="second-head-coach",
             available_at=BASE - timedelta(days=1),
             effective_from=BASE - timedelta(days=1),
-            stint_key="alt",
         ),
     )
     with pytest.raises(ValueError, match="multiple active coaching assignments claim HEAD_COACH"):
@@ -530,7 +648,6 @@ def test_multiple_active_offensive_play_callers_fail_closed() -> None:
             available_at=BASE - timedelta(days=1),
             responsibilities=(CoachingResponsibility.OFFENSIVE_PLAY_CALLER,),
             effective_from=BASE - timedelta(days=1),
-            stint_key="alt",
         ),
     )
     with pytest.raises(
@@ -548,7 +665,6 @@ def test_multiple_active_offensive_play_callers_fail_closed() -> None:
 
 
 def test_unconditional_tendency_evidence_is_rejected() -> None:
-    empty_condition = CoachingGameStateCondition()
     with pytest.raises(ValueError, match="explicitly game-state conditioned"):
         _scheme(
             1,
@@ -556,7 +672,21 @@ def test_unconditional_tendency_evidence_is_rejected() -> None:
             available_at=BASE - timedelta(days=1),
             metric_name="neutral_pass_rate",
             metric_value=0.60,
-            condition=empty_condition,
+            condition=CoachingGameStateCondition(),
+        )
+
+
+def test_non_policy_component_cannot_be_game_specific_deviation() -> None:
+    with pytest.raises(ValueError, match="only valid for policy/scheme components"):
+        _scheme(
+            1,
+            component=CoachingStateComponent.COACHING_EFFECTIVENESS,
+            available_at=BASE - timedelta(days=1),
+            metric_name="decision_quality",
+            metric_value=0.70,
+            condition=CoachingGameStateCondition(),
+            scope=CoachingEvidenceScope.GAME_SPECIFIC_DEVIATION,
+            source_game_id=None,
         )
 
 
@@ -609,7 +739,12 @@ def test_public_scheme_label_is_descriptive_not_empirical_scheme_state() -> None
         public_scheme_labels=(label,),
         created_at=BASE + timedelta(seconds=1),
     )
-    assert snapshot.state_payload.public_scheme_labels == (label,)
+    assert snapshot.state_payload.public_scheme_labels == (
+        PublicSchemeLabel(
+            side=PublicSchemeSide.OFFENSE,
+            label="West Coast offense",
+        ),
+    )
     assert snapshot.state_payload.offensive_scheme_state.base_estimates == ()
 
 
@@ -926,5 +1061,48 @@ def test_repository_build_records_sealed_coaching_state_with_exact_inputs() -> N
         ).fetchone()
         assert stored_input_count is not None
         assert int(stored_input_count[0]) == len(snapshot.input_observations)
+    finally:
+        connection.close()
+
+
+def test_persisted_play_caller_transition_preserves_earlier_coaching_state() -> None:
+    connection = _connection()
+    try:
+        base = _base_assignments(as_of=BASE)
+        old_caller = next(
+            item for item in base if item.logical_key == "offensive-play-caller"
+        )
+        future_caller = _assignment(
+            40,
+            person_id=ALT_ID,
+            role_type=CoachingRoleType.OTHER,
+            logical_key=old_caller.logical_key,
+            revision=2,
+            available_at=CHANGE - timedelta(hours=3),
+            responsibilities=(CoachingResponsibility.OFFENSIVE_PLAY_CALLER,),
+            effective_from=CHANGE,
+        )
+        for assignment in (*base, future_caller):
+            record_coaching_assignment_observation(connection, assignment)
+        early = build_coaching_state_as_of(
+            connection,
+            team_season_id=TEAM_ID,
+            game_id=GAME_ID,
+            as_of=CHANGE - timedelta(hours=2),
+            created_at=CHANGE - timedelta(hours=2) + timedelta(seconds=1),
+        )
+        late = build_coaching_state_as_of(
+            connection,
+            team_season_id=TEAM_ID,
+            game_id=GAME_ID,
+            as_of=CHANGE + timedelta(hours=1),
+            created_at=CHANGE + timedelta(hours=1, seconds=1),
+        )
+        assert early.state_payload.offensive_play_caller_id == OC_ID
+        assert late.state_payload.offensive_play_caller_id == ALT_ID
+        assert early.state_payload.head_coach_id == late.state_payload.head_coach_id
+        assert early.snapshot_id != late.snapshot_id
+        assert state_snapshot_is_sealed(connection, early.snapshot_id)
+        assert state_snapshot_is_sealed(connection, late.snapshot_id)
     finally:
         connection.close()
