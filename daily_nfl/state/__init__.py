@@ -15,10 +15,12 @@ from daily_nfl.state.coaching import (
     CoachingStatePayload,
     ConditionedCoachingEstimate,
     EmpiricalSchemeState,
+    PublicSchemeLabel,
     PublicSchemeLabelObservation,
     PublicSchemeSide,
     build_coaching_state_snapshot,
     coaching_regime_id,
+    resolve_active_coaching_assignments,
 )
 from daily_nfl.state.coaching_repository import (
     CoachingStateEvidenceConflictError,
@@ -177,6 +179,7 @@ __all__ = [
     "PosteriorUnitConfiguration",
     "PracticeStatus",
     "Probability",
+    "PublicSchemeLabel",
     "PublicSchemeLabelObservation",
     "PublicSchemeSide",
     "StateCoverage",
@@ -228,6 +231,7 @@ __all__ = [
     "record_unit_configuration_observation",
     "record_unit_state_evidence",
     "require_state_snapshot_sealed",
+    "resolve_active_coaching_assignments",
     "resolve_player_position",
     "state_snapshot_is_sealed",
     "unit_configuration_distribution_sha256",
