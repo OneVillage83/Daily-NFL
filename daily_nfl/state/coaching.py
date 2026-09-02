@@ -492,12 +492,24 @@ class PublicSchemeLabelObservation:
 
 
 @dataclass(frozen=True, slots=True)
+class PublicSchemeLabel:
+    """Provider-neutral descriptive label projected into Coaching State."""
+
+    side: PublicSchemeSide
+    label: str
+
+    def __post_init__(self) -> None:
+        _require_nonblank(self.label, "public scheme label")
+
+
+@dataclass(frozen=True, slots=True)
 class ActiveCoachingAssignment:
+    """Provider-neutral active assignment used by coaching-regime identity."""
+
     coaching_stint_id: CoachingStintId
     person_id: PersonId
     role_type: CoachingRoleType
     responsibilities: tuple[CoachingResponsibility, ...]
-    logical_key: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -551,7 +563,7 @@ class CoachingStatePayload:
     special_teams_coordinator_id: PersonId | None
     offensive_play_caller_id: PersonId | None
     defensive_play_caller_id: PersonId | None
-    public_scheme_labels: tuple[PublicSchemeLabelObservation, ...]
+    public_scheme_labels: tuple[PublicSchemeLabel, ...]
     offensive_scheme_state: EmpiricalSchemeState
     defensive_scheme_state: EmpiricalSchemeState
     special_teams_state: EmpiricalSchemeState
@@ -601,63 +613,168 @@ class CoachingStateEstimatorConfig:
 DEFAULT_COACHING_STATE_ESTIMATOR_CONFIG = CoachingStateEstimatorConfig()
 
 
+def _assignment_semantic_payload(
+    assignment: CoachingAssignmentObservation,
+) -> dict[str, object]:
+    return {
+        "coaching_stint_id": str(assignment.coaching_stint_id),
+        "person_id": str(assignment.person_id),
+        "role_type": assignment.role_type.value,
+        "responsibilities": [
+            responsibility.value
+            for responsibility in assignment.canonical_responsibilities
+        ],
+    }
+
+
 def coaching_regime_id(
     assignments: tuple[CoachingAssignmentObservation, ...],
 ) -> CoachingRegimeId:
     if not assignments:
         raise ValueError("coaching regime requires at least one active assignment")
-    payload = [
-        {
-            "logical_key": assignment.logical_key,
-            "coaching_stint_id": str(assignment.coaching_stint_id),
-            "person_id": str(assignment.person_id),
-            "role_type": assignment.role_type.value,
-            "responsibilities": [
-                responsibility.value
-                for responsibility in assignment.canonical_responsibilities
-            ],
-        }
-        for assignment in sorted(
-            assignments,
-            key=lambda item: (
-                item.logical_key,
-                str(item.person_id),
-                item.role_type.value,
-            ),
-        )
-    ]
+    team_ids = {str(item.team_season_id) for item in assignments}
+    if len(team_ids) != 1:
+        raise ValueError("coaching regime assignments must belong to one team-season")
+    payload = {
+        "team_season_id": next(iter(team_ids)),
+        "assignments": [
+            _assignment_semantic_payload(assignment)
+            for assignment in sorted(
+                assignments,
+                key=lambda item: (
+                    str(item.coaching_stint_id),
+                    str(item.person_id),
+                    item.role_type.value,
+                    tuple(value.value for value in item.canonical_responsibilities),
+                ),
+            )
+        ],
+    }
     return CoachingRegimeId(f"coaching_regime_{_sha256(payload)}")
 
 
-def _latest_assignments_as_of(
+def resolve_active_coaching_assignments(
     assignments: tuple[CoachingAssignmentObservation, ...],
     *,
     team_season_id: TeamSeasonId,
     as_of: datetime,
 ) -> tuple[CoachingAssignmentObservation, ...]:
-    latest: dict[str, CoachingAssignmentObservation] = {}
+    """Resolve latest known active assignment semantics for one PIT cutoff.
+
+    Revisions normally supersede earlier interpretations. A special case is a
+    legitimately known future-effective revision: it must not hide the current
+    active revision before its effective_from timestamp. An ended latest
+    revision does not resurrect an older revision.
+    """
+
+    grouped: dict[str, list[CoachingAssignmentObservation]] = {}
     for assignment in assignments:
         if assignment.team_season_id != team_season_id:
             raise ValueError("coaching assignment belongs to a different team")
         if assignment.knowledge.available_at > as_of:
             raise ValueError("coaching assignment cannot be available after Coaching State as_of")
-        existing = latest.get(assignment.logical_key)
-        if existing is None or assignment.revision > existing.revision:
-            latest[assignment.logical_key] = assignment
-        elif assignment.revision == existing.revision:
-            if assignment.payload_sha256 != existing.payload_sha256:
-                raise ValueError("conflicting coaching assignment revisions at PIT cutoff")
-            if str(assignment.observation_id) < str(existing.observation_id):
-                latest[assignment.logical_key] = assignment
-    active = tuple(
+        grouped.setdefault(assignment.logical_key, []).append(assignment)
+
+    active: list[CoachingAssignmentObservation] = []
+    for logical_key in sorted(grouped):
+        candidates = sorted(
+            grouped[logical_key],
+            key=lambda item: (item.revision, str(item.observation_id)),
+            reverse=True,
+        )
+        highest_revision = candidates[0].revision
+        same_revision = [item for item in candidates if item.revision == highest_revision]
+        payload_hashes = {item.payload_sha256 for item in same_revision}
+        if len(payload_hashes) != 1:
+            raise ValueError("conflicting coaching assignment revisions at PIT cutoff")
+        latest = min(same_revision, key=lambda item: str(item.observation_id))
+        if latest.is_active_at(as_of):
+            active.append(latest)
+            continue
+        if latest.effective_from is not None and latest.effective_from > as_of:
+            fallback = next(
+                (
+                    item
+                    for item in candidates
+                    if item.revision < highest_revision and item.is_active_at(as_of)
+                ),
+                None,
+            )
+            if fallback is not None:
+                active.append(fallback)
+
+    result = tuple(
         sorted(
-            (item for item in latest.values() if item.is_active_at(as_of)),
-            key=lambda item: (item.logical_key, str(item.person_id)),
+            active,
+            key=lambda item: (
+                str(item.coaching_stint_id),
+                str(item.person_id),
+                item.role_type.value,
+            ),
         )
     )
-    if not active:
+    if not result:
         raise ValueError("Coaching State requires at least one active coaching assignment")
-    return active
+    return result
+
+
+def _latest_scheme_evidence(
+    observations: tuple[CoachingSchemeEvidenceObservation, ...],
+    *,
+    team_season_id: TeamSeasonId,
+    game_id: GameId,
+    as_of: datetime,
+) -> tuple[CoachingSchemeEvidenceObservation, ...]:
+    latest: dict[str, CoachingSchemeEvidenceObservation] = {}
+    for observation in observations:
+        if observation.team_season_id != team_season_id:
+            raise ValueError("coaching scheme evidence belongs to a different team")
+        if observation.knowledge.available_at > as_of:
+            raise ValueError("coaching scheme evidence cannot be available after Coaching State as_of")
+        if observation.source_game_id == game_id:
+            raise ValueError("current pregame target game cannot be coaching source evidence")
+        if (
+            observation.evidence_scope is CoachingEvidenceScope.GAME_SPECIFIC_DEVIATION
+            and observation.applies_to_game_id != game_id
+        ):
+            raise ValueError("game-specific coaching evidence applies to a different game")
+        existing = latest.get(observation.logical_key)
+        if existing is None or observation.revision > existing.revision:
+            latest[observation.logical_key] = observation
+        elif observation.revision == existing.revision:
+            if observation.payload_sha256 != existing.payload_sha256:
+                raise ValueError("conflicting coaching scheme revisions at PIT cutoff")
+            if str(observation.observation_id) < str(existing.observation_id):
+                latest[observation.logical_key] = observation
+    return tuple(sorted(latest.values(), key=lambda item: str(item.observation_id)))
+
+
+def _latest_public_labels(
+    observations: tuple[PublicSchemeLabelObservation, ...],
+    *,
+    team_season_id: TeamSeasonId,
+    as_of: datetime,
+) -> tuple[PublicSchemeLabelObservation, ...]:
+    latest: dict[str, PublicSchemeLabelObservation] = {}
+    for observation in observations:
+        if observation.team_season_id != team_season_id:
+            raise ValueError("public scheme label belongs to a different team")
+        if observation.knowledge.available_at > as_of:
+            raise ValueError("public scheme label cannot be available after Coaching State as_of")
+        existing = latest.get(observation.logical_key)
+        if existing is None or observation.revision > existing.revision:
+            latest[observation.logical_key] = observation
+        elif observation.revision == existing.revision:
+            if observation.payload_sha256 != existing.payload_sha256:
+                raise ValueError("conflicting public scheme label revisions at PIT cutoff")
+            if str(observation.observation_id) < str(existing.observation_id):
+                latest[observation.logical_key] = observation
+    return tuple(
+        sorted(
+            latest.values(),
+            key=lambda item: (item.side.value, item.label, str(item.observation_id)),
+        )
+    )
 
 
 def _validate_unique_assignments(
@@ -810,47 +927,6 @@ def _empirical_scheme_state(
     )
 
 
-def _validate_scheme_evidence(
-    observations: tuple[CoachingSchemeEvidenceObservation, ...],
-    *,
-    team_season_id: TeamSeasonId,
-    game_id: GameId,
-    as_of: datetime,
-) -> tuple[CoachingSchemeEvidenceObservation, ...]:
-    for observation in observations:
-        if observation.team_season_id != team_season_id:
-            raise ValueError("coaching scheme evidence belongs to a different team")
-        if observation.knowledge.available_at > as_of:
-            raise ValueError("coaching scheme evidence cannot be available after Coaching State as_of")
-        if observation.source_game_id == game_id:
-            raise ValueError("current pregame target game cannot be coaching source evidence")
-        if (
-            observation.evidence_scope is CoachingEvidenceScope.GAME_SPECIFIC_DEVIATION
-            and observation.applies_to_game_id != game_id
-        ):
-            raise ValueError("game-specific coaching evidence applies to a different game")
-    return tuple(sorted(observations, key=lambda item: str(item.observation_id)))
-
-
-def _validate_public_labels(
-    observations: tuple[PublicSchemeLabelObservation, ...],
-    *,
-    team_season_id: TeamSeasonId,
-    as_of: datetime,
-) -> tuple[PublicSchemeLabelObservation, ...]:
-    for observation in observations:
-        if observation.team_season_id != team_season_id:
-            raise ValueError("public scheme label belongs to a different team")
-        if observation.knowledge.available_at > as_of:
-            raise ValueError("public scheme label cannot be available after Coaching State as_of")
-    return tuple(
-        sorted(
-            observations,
-            key=lambda item: (item.side.value, item.logical_key, str(item.observation_id)),
-        )
-    )
-
-
 def _unknown_if_none(
     name: str,
     value: object | None,
@@ -894,22 +970,28 @@ def build_coaching_state_snapshot(
 
     _require_aware(as_of, "Coaching State as_of")
     _require_aware(created_at, "Coaching State created_at")
-    active = _latest_assignments_as_of(
+    active = resolve_active_coaching_assignments(
         assignment_observations,
         team_season_id=team_season_id,
         as_of=as_of,
     )
     _validate_unique_assignments(active)
-    evidence = _validate_scheme_evidence(
+    evidence = _latest_scheme_evidence(
         scheme_evidence,
         team_season_id=team_season_id,
         game_id=game_id,
         as_of=as_of,
     )
-    labels = _validate_public_labels(
+    label_observations = _latest_public_labels(
         public_scheme_labels,
         team_season_id=team_season_id,
         as_of=as_of,
+    )
+    semantic_labels = tuple(
+        sorted(
+            {PublicSchemeLabel(side=item.side, label=item.label) for item in label_observations},
+            key=lambda item: (item.side.value, item.label),
+        )
     )
 
     regime_id = coaching_regime_id(active)
@@ -919,7 +1001,6 @@ def build_coaching_state_snapshot(
             person_id=item.person_id,
             role_type=item.role_type,
             responsibilities=item.canonical_responsibilities,
-            logical_key=item.logical_key,
         )
         for item in active
     )
@@ -1000,7 +1081,7 @@ def build_coaching_state_snapshot(
         special_teams_coordinator_id=special_teams_coordinator_id,
         offensive_play_caller_id=offensive_play_caller_id,
         defensive_play_caller_id=defensive_play_caller_id,
-        public_scheme_labels=labels,
+        public_scheme_labels=semantic_labels,
         offensive_scheme_state=offensive,
         defensive_scheme_state=defensive,
         special_teams_state=special_teams,
@@ -1093,7 +1174,7 @@ def build_coaching_state_snapshot(
     inputs = tuple(
         [item.to_pit_input_ref() for item in active]
         + [item.to_pit_input_ref() for item in evidence]
-        + [item.to_pit_input_ref() for item in labels]
+        + [item.to_pit_input_ref() for item in label_observations]
     )
     return build_state_snapshot(
         state_type=StateType.COACHING,
