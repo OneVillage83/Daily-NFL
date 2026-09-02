@@ -43,6 +43,7 @@ CREATE TABLE coaching_assignment_observations (
     evidence_id TEXT REFERENCES raw_evidence(evidence_id),
     evidence_observation_id TEXT
         REFERENCES raw_evidence_observations(evidence_observation_id),
+    knowledge_effective_at TEXT,
     published_at TEXT,
     observed_at TEXT,
     ingested_at TEXT,
@@ -60,7 +61,12 @@ CREATE TABLE coaching_assignment_observations (
     CHECK (trim(assignment_contract) <> ''),
     CHECK (trim(assignment_version) <> ''),
     CHECK (length(responsibilities_sha256) = 64),
-    CHECK (length(payload_sha256) = 64)
+    CHECK (length(payload_sha256) = 64),
+    CHECK (
+        effective_from IS NULL
+        OR effective_to IS NULL
+        OR effective_to >= effective_from
+    )
 );
 
 CREATE INDEX idx_coaching_assignment_lookup
@@ -127,7 +133,13 @@ CREATE TABLE coaching_scheme_evidence_observations (
     CHECK (length(payload_sha256) = 64),
     CHECK (
         evidence_scope <> 'GAME_SPECIFIC_DEVIATION'
-        OR applies_to_game_id IS NOT NULL
+        OR (
+            applies_to_game_id IS NOT NULL
+            AND component IN (
+                'OFFENSIVE_SCHEME', 'DEFENSIVE_SCHEME',
+                'SPECIAL_TEAMS_SCHEME', 'DECISION_POLICY'
+            )
+        )
     ),
     CHECK (
         evidence_scope <> 'BASE'
