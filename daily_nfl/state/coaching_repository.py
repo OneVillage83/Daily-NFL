@@ -33,6 +33,7 @@ from daily_nfl.state.coaching import (
     PublicSchemeLabelObservation,
     PublicSchemeSide,
     build_coaching_state_snapshot,
+    resolve_active_coaching_assignments,
 )
 from daily_nfl.state.contracts import StateSnapshotEnvelope
 from daily_nfl.state.repository import record_state_snapshot
@@ -185,6 +186,7 @@ def _assignment_row_values(
         observation.provider_id,
         observation.evidence_id,
         observation.evidence_observation_id,
+        _iso(observation.knowledge.effective_at),
         _iso(observation.knowledge.published_at),
         _iso(observation.knowledge.observed_at),
         _iso(observation.knowledge.ingested_at),
@@ -238,10 +240,11 @@ def record_coaching_assignment_observation(
                logical_key, revision, role_type, responsibilities_json,
                responsibilities_sha256, payload_sha256, effective_from,
                effective_to, assignment_contract, assignment_version,
-               provider_id, evidence_id, evidence_observation_id, published_at,
-               observed_at, ingested_at, available_at, availability_method,
-               availability_confidence, provider_revision, provider_schema_version,
-               parser_version, raw_sha256
+               provider_id, evidence_id, evidence_observation_id,
+               knowledge_effective_at, published_at, observed_at, ingested_at,
+               available_at, availability_method, availability_confidence,
+               provider_revision, provider_schema_version, parser_version,
+               raw_sha256
         FROM coaching_assignment_observations
         WHERE observation_id = ?
         """,
@@ -261,12 +264,13 @@ def record_coaching_assignment_observation(
             logical_key, revision, role_type, responsibilities_json,
             responsibilities_sha256, payload_sha256, effective_from, effective_to,
             assignment_contract, assignment_version, provider_id, evidence_id,
-            evidence_observation_id, published_at, observed_at, ingested_at,
-            available_at, availability_method, availability_confidence,
-            provider_revision, provider_schema_version, parser_version, raw_sha256
+            evidence_observation_id, knowledge_effective_at, published_at,
+            observed_at, ingested_at, available_at, availability_method,
+            availability_confidence, provider_revision, provider_schema_version,
+            parser_version, raw_sha256
         ) VALUES (
             ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-            ?, ?, ?, ?, ?, ?, ?
+            ?, ?, ?, ?, ?, ?, ?, ?
         )
         """,
         values,
@@ -299,6 +303,7 @@ def _assignment_from_row(row: sqlite3.Row) -> CoachingAssignmentObservation:
         raw_sha256=_optional_text(row["raw_sha256"]),
         knowledge=KnowledgeTimestamp(
             available_at=available_at,
+            effective_at=_parse_time(row["knowledge_effective_at"]),
             published_at=_parse_time(row["published_at"]),
             observed_at=_parse_time(row["observed_at"]),
             ingested_at=_parse_time(row["ingested_at"]),
@@ -310,7 +315,8 @@ def _assignment_from_row(row: sqlite3.Row) -> CoachingAssignmentObservation:
     )
     if observation.responsibilities_sha256 != str(row["responsibilities_sha256"]):
         raise CoachingStateEvidenceConflictError(
-            f"stored coaching assignment {observation.observation_id!s} has invalid responsibilities hash"
+            "stored coaching assignment "
+            f"{observation.observation_id!s} has invalid responsibilities hash"
         )
     if observation.payload_sha256 != str(row["payload_sha256"]):
         raise CoachingStateEvidenceConflictError(
@@ -460,11 +466,13 @@ def _scheme_from_row(row: sqlite3.Row) -> CoachingSchemeEvidenceObservation:
     )
     if int(observation.game_state_conditioned) != int(row["game_state_conditioned"]):
         raise CoachingStateEvidenceConflictError(
-            f"stored coaching scheme evidence {observation.observation_id!s} has invalid conditioning flag"
+            "stored coaching scheme evidence "
+            f"{observation.observation_id!s} has invalid conditioning flag"
         )
     if observation.conditioning_sha256 != str(row["conditioning_sha256"]):
         raise CoachingStateEvidenceConflictError(
-            f"stored coaching scheme evidence {observation.observation_id!s} has invalid conditioning hash"
+            "stored coaching scheme evidence "
+            f"{observation.observation_id!s} has invalid conditioning hash"
         )
     if observation.metrics_sha256 != str(row["metrics_sha256"]):
         raise CoachingStateEvidenceConflictError(
@@ -507,7 +515,7 @@ def record_public_scheme_label_observation(
     connection: sqlite3.Connection,
     observation: PublicSchemeLabelObservation,
 ) -> None:
-    """Persist one descriptive public scheme label without treating it as analytics."""
+    """Persist a descriptive public label without promoting it to analytics."""
 
     existing = connection.execute(
         """
@@ -588,7 +596,7 @@ def coaching_assignments_as_of(
     team_season_id: TeamSeasonId,
     as_of: datetime,
 ) -> tuple[CoachingAssignmentObservation, ...]:
-    """Return latest-known active coaching assignments at one PIT cutoff."""
+    """Return resolved active coaching assignments at one PIT cutoff."""
 
     if as_of.tzinfo is None or as_of.utcoffset() is None:
         raise ValueError("coaching assignment as_of must be timezone-aware")
@@ -598,33 +606,26 @@ def coaching_assignments_as_of(
                logical_key, revision, role_type, responsibilities_json,
                responsibilities_sha256, payload_sha256, effective_from,
                effective_to, assignment_contract, assignment_version,
-               provider_id, evidence_id, evidence_observation_id, published_at,
-               observed_at, ingested_at, available_at, availability_method,
-               availability_confidence, provider_revision, provider_schema_version,
-               parser_version, raw_sha256
+               provider_id, evidence_id, evidence_observation_id,
+               knowledge_effective_at, published_at, observed_at, ingested_at,
+               available_at, availability_method, availability_confidence,
+               provider_revision, provider_schema_version, parser_version,
+               raw_sha256
         FROM coaching_assignment_observations
         WHERE team_season_id = ? AND available_at <= ?
         ORDER BY logical_key, revision, available_at, observation_id
         """,
         (str(team_season_id), _iso(as_of)),
     ).fetchall()
-    latest_by_key: dict[str, CoachingAssignmentObservation] = {}
-    for row in rows:
-        observation = _assignment_from_row(row)
-        existing = latest_by_key.get(observation.logical_key)
-        if existing is None or observation.revision > existing.revision:
-            latest_by_key[observation.logical_key] = observation
-        elif observation.revision == existing.revision:
-            if observation.payload_sha256 != existing.payload_sha256:
-                raise CoachingStateEvidenceConflictError(
-                    f"conflicting coaching assignment revision for {observation.logical_key!r}"
-                )
-    return tuple(
-        sorted(
-            (item for item in latest_by_key.values() if item.is_active_at(as_of)),
-            key=lambda item: (item.logical_key, str(item.observation_id)),
+    observations = tuple(_assignment_from_row(row) for row in rows)
+    try:
+        return resolve_active_coaching_assignments(
+            observations,
+            team_season_id=team_season_id,
+            as_of=as_of,
         )
-    )
+    except ValueError as exc:
+        raise CoachingStateEvidenceConflictError(str(exc)) from exc
 
 
 def coaching_scheme_evidence_as_of(
@@ -653,10 +654,7 @@ def coaching_scheme_evidence_as_of(
         WHERE team_season_id = ?
           AND available_at <= ?
           AND (source_game_id IS NULL OR source_game_id <> ?)
-          AND (
-              evidence_scope = 'BASE'
-              OR applies_to_game_id = ?
-          )
+          AND (evidence_scope = 'BASE' OR applies_to_game_id = ?)
         ORDER BY logical_key, revision, available_at, observation_id
         """,
         (str(team_season_id), _iso(as_of), str(game_id), str(game_id)),
@@ -672,6 +670,8 @@ def coaching_scheme_evidence_as_of(
                 raise CoachingStateEvidenceConflictError(
                     f"conflicting coaching scheme revision for {observation.logical_key!r}"
                 )
+            if str(observation.observation_id) < str(existing.observation_id):
+                latest_by_key[observation.logical_key] = observation
     return tuple(
         sorted(latest_by_key.values(), key=lambda item: str(item.observation_id))
     )
@@ -712,10 +712,12 @@ def public_scheme_labels_as_of(
                 raise CoachingStateEvidenceConflictError(
                     f"conflicting public scheme label revision for {observation.logical_key!r}"
                 )
+            if str(observation.observation_id) < str(existing.observation_id):
+                latest_by_key[observation.logical_key] = observation
     return tuple(
         sorted(
             latest_by_key.values(),
-            key=lambda item: (item.side.value, item.logical_key),
+            key=lambda item: (item.side.value, item.label, item.logical_key),
         )
     )
 
