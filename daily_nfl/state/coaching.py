@@ -730,7 +730,9 @@ def _latest_scheme_evidence(
         if observation.team_season_id != team_season_id:
             raise ValueError("coaching scheme evidence belongs to a different team")
         if observation.knowledge.available_at > as_of:
-            raise ValueError("coaching scheme evidence cannot be available after Coaching State as_of")
+            raise ValueError(
+                "coaching scheme evidence cannot be available after Coaching State as_of"
+            )
         if observation.source_game_id == game_id:
             raise ValueError("current pregame target game cannot be coaching source evidence")
         if (

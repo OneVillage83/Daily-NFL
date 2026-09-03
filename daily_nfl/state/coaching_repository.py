@@ -476,11 +476,13 @@ def _scheme_from_row(row: sqlite3.Row) -> CoachingSchemeEvidenceObservation:
         )
     if observation.metrics_sha256 != str(row["metrics_sha256"]):
         raise CoachingStateEvidenceConflictError(
-            f"stored coaching scheme evidence {observation.observation_id!s} has invalid metrics hash"
+            "stored coaching scheme evidence "
+            f"{observation.observation_id!s} has invalid metrics hash"
         )
     if observation.payload_sha256 != str(row["payload_sha256"]):
         raise CoachingStateEvidenceConflictError(
-            f"stored coaching scheme evidence {observation.observation_id!s} has invalid payload hash"
+            "stored coaching scheme evidence "
+            f"{observation.observation_id!s} has invalid payload hash"
         )
     return observation
 

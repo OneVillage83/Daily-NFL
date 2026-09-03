@@ -572,7 +572,7 @@ def test_play_caller_change_creates_new_regime_without_changing_head_coach() -> 
         role_type=CoachingRoleType.OTHER,
         logical_key=old_caller.logical_key,
         revision=2,
-        available_at=CHANGE - timedelta(hours=1),
+        available_at=CHANGE - timedelta(hours=3),
         responsibilities=(CoachingResponsibility.OFFENSIVE_PLAY_CALLER,),
         effective_from=CHANGE,
     )

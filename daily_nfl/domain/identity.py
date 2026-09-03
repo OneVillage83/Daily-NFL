@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from daily_nfl.domain.ids import (
-    CoachRoleId,
     CoachingStintId,
+    CoachRoleId,
     FranchiseId,
     PersonId,
     PlayerId,
