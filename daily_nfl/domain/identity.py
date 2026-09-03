@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from daily_nfl.domain.ids import (
+    CoachingStintId,
     CoachRoleId,
     FranchiseId,
     PersonId,
@@ -72,6 +73,25 @@ class RosterStint:
 
     roster_stint_id: RosterStintId
     player_id: PlayerId
+    team_season_id: TeamSeasonId
+    started_at: datetime | None = None
+    ended_at: datetime | None = None
+
+    def __post_init__(self) -> None:
+        _validate_optional_interval(self.started_at, self.ended_at)
+
+
+@dataclass(frozen=True, slots=True)
+class CoachingStint:
+    """A coach's time-bounded relationship with one team-season.
+
+    Person identity persists across teams and years. A stint represents the
+    team-scoped relationship; role titles and decision responsibilities may
+    change within the stint and are therefore versioned separately by F-9.
+    """
+
+    coaching_stint_id: CoachingStintId
+    person_id: PersonId
     team_season_id: TeamSeasonId
     started_at: datetime | None = None
     ended_at: datetime | None = None

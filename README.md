@@ -14,10 +14,12 @@ Daily NFL is the NFL modeling engine for **The Daily Line**. Its governing archi
 - M6 Canonical Play / Drive Normalization: **ARCHITECTURE-CERTIFIED**
 - M6B real nflverse PBP validation: completed; corrected raw-row-adjacency evidence is incorporated into M6 certification
 - M6C Controlled Historical Continuation / Full Historical Compatibility: **ARCHITECTURE-CERTIFIED**
-- M6C running resume/evidence log: `docs/implementation/M6C_PROGRESS_LOG.md`
-- M6C locked checkpoint contract: `docs/implementation/M6C_HISTORICAL_CONTINUATION_CONTRACT.md`
-- M7 State Engine V1: **NEXT** after M6C PR #9 is merged to main
+- M7 State Engine V1: **IN PROGRESS** on `checkpoint/m7-state-engine-v1`
+- M7 locked implementation contract: `docs/implementation/M7_STATE_ENGINE_V1_CONTRACT.md`
+- M7 pre-implementation conformance audit: `docs/implementation/M7_PREIMPLEMENTATION_CONFORMANCE_AUDIT.md`
+- M7 running progress/resume log: `docs/implementation/M7_PROGRESS_LOG.md`
 - M6 certification evidence: `docs/implementation/M6_ARCHITECTURE_CONFORMANCE_AUDIT.md` and `docs/implementation/M6_LOCAL_VALIDATION_20260823.md`
+- M6C certification evidence: `docs/implementation/M6C_ARCHITECTURE_CONFORMANCE_AUDIT.md` and `docs/implementation/M6C_LOCAL_VALIDATION_20260826.md`
 
 The current certification authority is `docs/implementation/ARCHITECTURE_CERTIFICATION_LOG.md`. During an active checkpoint, the checkpoint-specific progress log is the authoritative resume point for unfinished work. The older `PROJECT_CHECKPOINT_LOG.md` remains a historical implementation snapshot from before the formal certification sequence and is not allowed to override newer certification/progress status.
 
@@ -100,13 +102,17 @@ Architecture certification log:
 
 - `docs/implementation/ARCHITECTURE_CERTIFICATION_LOG.md`
 
-M6C historical progress log:
+M7 implementation contract:
 
-- `docs/implementation/M6C_PROGRESS_LOG.md`
+- `docs/implementation/M7_STATE_ENGINE_V1_CONTRACT.md`
 
-M6C checkpoint contract:
+M7 pre-implementation audit:
 
-- `docs/implementation/M6C_HISTORICAL_CONTINUATION_CONTRACT.md`
+- `docs/implementation/M7_PREIMPLEMENTATION_CONFORMANCE_AUDIT.md`
+
+M7 active progress log:
+
+- `docs/implementation/M7_PROGRESS_LOG.md`
 
 Historical consolidated checkpoint:
 
@@ -146,3 +152,8 @@ M6 certification evidence:
 
 - `docs/implementation/M6_ARCHITECTURE_CONFORMANCE_AUDIT.md`
 - `docs/implementation/M6_LOCAL_VALIDATION_20260823.md`
+
+M6C certification evidence:
+
+- `docs/implementation/M6C_ARCHITECTURE_CONFORMANCE_AUDIT.md`
+- `docs/implementation/M6C_LOCAL_VALIDATION_20260826.md`
