@@ -5,7 +5,7 @@
 **Branch:** `checkpoint/m7-state-engine-v1`
 **Certified base:** `0dd515ec36f370ce70f67b3e771e1ceb4e36a149`
 **Architecture:** F-6, F-7, F-8, F-9, F-10
-**Status:** IN PROGRESS — M7-E CLOSED / M7-F PREVALIDATION CANDIDATE
+**Status:** IN PROGRESS — M7-E CLOSED / M7-F FULL CODE GATE PASS / DB GATE NEXT
 
 This file is the authoritative resume point while M7 is open. Final certification status remains governed by `ARCHITECTURE_CERTIFICATION_LOG.md`.
 
@@ -22,6 +22,7 @@ This file is the authoritative resume point while M7 is open. Final certificatio
 - `docs/implementation/M7_C_INJURY_AVAILABILITY_RESULT.md`
 - `docs/implementation/M7_D_PLAYER_STATE_RESULT.md`
 - `docs/implementation/M7_E_UNIT_STATE_RESULT.md`
+- `docs/implementation/M7_F_PREVALIDATION_VALIDATION_20260902.md`
 
 ## 2. Locked scope
 
@@ -138,7 +139,7 @@ M7-B  Migration v8 + state snapshot/input/dependency ledger  CLOSED / PASS
 M7-C  Injury observation / episode / availability             CLOSED / PASS
 M7-D  Player State V1                                         CLOSED / PASS
 M7-E  Unit State V1                                           CLOSED / PASS
-M7-F  Coaching & Scheme State V1                              PREVALIDATION CANDIDATE
+M7-F  Coaching & Scheme State V1                              FULL CODE GATE PASS / DB GATE NEXT
 M7-G  Team State V1                                           NOT STARTED
 M7-H  Dependency propagation / rebuild inspection             NOT STARTED
 M7-I  PIT multi-snapshot validation                           NOT STARTED
@@ -206,7 +207,7 @@ The branch now contains:
 - repository reconstruction plus immutable Coaching State sealing;
 - focused negative/regression tests for assignment revisions, future announcements, play-caller transitions, duplicate responsibilities, unconditional tendency misuse, target-game leakage, post-cutoff evidence, base/deviation separation, public-label separation, and immutable replay.
 
-Migration v12 is **NOT APPLIED** and remains editable until focused/static and then full-repository validation pass.
+Migration v12 is **NOT APPLIED** and remains unfrozen until the database gate passes.
 
 ### Prevalidation hardening decisions
 
@@ -217,6 +218,49 @@ Migration v12 is **NOT APPLIED** and remains editable until focused/static and t
 5. **Ended latest revisions do not resurrect older history.** Fallback is restricted to the future-effective-revision case.
 6. **Assignment clocks stay distinct.** Knowledge `effective_at` is persisted independently from the assignment's semantic effective interval.
 7. **Same person/team relationship can support multiple roles/responsibilities under one CoachingStint identity.**
+8. **Pure builders fail closed on explicit post-cutoff inputs.** Repository `as_of` selection filters future rows, but a caller that directly supplies an unavailable assignment to the pure builder gets a PIT violation rather than silent filtering.
+
+### Local validation history
+
+First prevalidation candidate:
+
+```text
+0b2ffe000d18ac7d3d5a7cae3a243f0a8c4f198c
+focused F-9 pytest: 28 passed / 1 failed
+focused mypy: PASS — 3 source files
+Ruff: 4 findings
+migration v12: NOT APPLIED
+```
+
+The lone behavioral failure was a test-fixture PIT timing defect: the test explicitly supplied an assignment whose `available_at` was after the requested snapshot cutoff. Production fail-closed behavior was retained. The fixture announcement timestamp was moved earlier so the transition was known but not yet effective, while three E501/import-order findings were remediated without semantic code changes.
+
+Remediation head:
+
+```text
+ee7450d9b980822cf82673f89d0f373aaa73f06f
+focused F-9 pytest: 29 passed
+Ruff: PASS
+focused mypy: PASS — 3 source files
+working tree: clean
+local/remote branch SHA: exact match
+```
+
+A dedicated test-only PIT regression guard was then added so direct post-cutoff assignment input remains fail-closed.
+
+Final full code compatibility head:
+
+```text
+a235f7c6845b53189010b3f2ceadbef4c78bf72f
+focused F-9 + PIT regression: 30 passed
+Ruff: PASS
+strict mypy: PASS — 121 source files
+full pytest: 318 passed
+git diff --check: PASS
+working tree: clean
+local/remote branch SHA: exact match
+```
+
+The code/static compatibility gate is therefore PASS. Migration v12 remains unapplied pending the real schema 11 -> 12 and fresh 0 -> 12 database proofs.
 
 ## 7. Gate state
 
@@ -229,7 +273,7 @@ M7-B migration/persistence        CLOSED / PASS
 M7-C injury/availability          CLOSED / PASS
 M7-D player state                 CLOSED / PASS
 M7-E unit state                   CLOSED / PASS
-M7-F coaching/scheme              PREVALIDATION CANDIDATE
+M7-F coaching/scheme              FULL CODE GATE PASS / DB GATE NEXT
 migration v12                     NOT APPLIED / NOT FROZEN
 M7-G team state                   LOCKED
 M7-H dependency propagation       NOT STARTED
@@ -240,11 +284,9 @@ M7 certification                  WITHHELD
 
 ## 8. Immediate next action
 
-Run the first local M7-F focused/static gate on the pinned branch head. Do **not** apply migration v12 yet.
+Run the M7-F database proof on the pinned validated executable authority. First upgrade a real schema-v11 database to v12 and immediately verify 12 -> 12. Then initialize a fresh database 0 -> 12 and verify 12 -> 12. Foreign keys and integrity must remain true throughout.
 
-If the focused/static gate is clean, advance to full-repository Ruff/mypy/pytest. Only after the full repository gate is clean may a real schema-v11 database be upgraded to v12 and a fresh 0 -> 12 initialization be used as migration proof.
-
-M7-G must remain locked until M7-F closes. Team State will consume Unit State and Coaching State rather than bypassing them.
+Once the database proof passes, migration v12 becomes immutable applied history and M7-F can close. M7-G must remain locked until that closure is recorded. Team State will consume Unit State and Coaching State rather than bypassing them.
 
 ## 9. Update rule
 
